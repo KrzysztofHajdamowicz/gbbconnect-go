@@ -182,6 +182,9 @@ Design:
      - keep reading until that many bytes (+2 CRC) are present, or timeout.
   3. Validate the CRC of the assembled response; on mismatch, error.
   4. Return the full RTU frame (with CRC).
+- If one TCP read contains more than one complete response, retain the bytes
+  after the first frame and consume them during the next serialized exchange.
+  Closing or reconnecting clears this pending buffer.
 - No MBAP header, no transaction id. Correlation relies on the
   request/response being strictly serialized (the per-plant executor guarantees
   this).
