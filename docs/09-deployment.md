@@ -89,37 +89,33 @@ the [official Home Assistant app build configuration](https://developers.home-as
 
 ## 4. systemd (Linux)
 
-Mirror the original's unit (see [`../README.md`](../README.md)) but for the Go
-binary. Unit file (ticket GC-072) `/etc/systemd/system/gbbconnect.service`:
+The production unit is
+[`../deploy/systemd/gbbconnect.service`](../deploy/systemd/gbbconnect.service).
+Install it as `/etc/systemd/system/gbbconnect.service`:
 
-```ini
-[Unit]
-Description=gbbconnect-go (unofficial GbbConnect2)
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-Type=simple
-User=gbbconnect
-Group=gbbconnect
-ExecStart=/usr/local/bin/gbbconnect run --config /etc/gbbconnect/gbbconnect.yaml
-Restart=always
-RestartSec=10
-# hardening
-NoNewPrivileges=true
-ProtectSystem=strict
-ProtectHome=true
-StateDirectory=gbbconnect          # provides /var/lib/gbbconnect
-ConfigurationDirectory=gbbconnect  # provides /etc/gbbconnect
-# serial access (only if using modbus_serial):
-# SupplementaryGroups=dialout
-
-[Install]
-WantedBy=multi-user.target
+```bash
+useradd --system --user-group \
+  --home-dir /var/lib/gbbconnect --shell /usr/sbin/nologin gbbconnect
+install -o root -g root -m 0755 gbbconnect /usr/local/bin/gbbconnect
+install -o root -g root -m 0644 deploy/systemd/gbbconnect.service \
+  /etc/systemd/system/gbbconnect.service
+install -d -o gbbconnect -g gbbconnect -m 0750 /etc/gbbconnect
+install -o root -g gbbconnect -m 0640 gbbconnect.yaml \
+  /etc/gbbconnect/gbbconnect.yaml
+systemctl daemon-reload
+systemctl enable --now gbbconnect.service
 ```
 
-Behaviour: the binary runs in the foreground (no key wait), logs to
-stdout/stderr -> journald. This replaces the original's `--dont-wait-for-key`.
+The binary runs in the foreground and logs to stdout/stderr, so inspect it with
+`journalctl -u gbbconnect.service -f`. `StateDirectory=gbbconnect` provides the
+writable `/var/lib/gbbconnect` directory while `ProtectSystem=strict` keeps the
+rest of the filesystem read-only. `Restart=always` recovers from crashes and
+`systemctl enable` makes the service boot-persistent.
+
+For `modbus_serial`, enable `SupplementaryGroups=dialout` in the unit or a
+drop-in (use the actual serial-device group on the distribution). Full install,
+validation, update, and serial instructions are in
+[`../deploy/systemd/README.md`](../deploy/systemd/README.md).
 
 ## 5. Windows Service
 

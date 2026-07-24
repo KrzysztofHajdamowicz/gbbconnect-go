@@ -1,0 +1,49 @@
+[Unit]
+Description=gbbconnect-go MQTT-to-Modbus bridge
+Documentation=https://github.com/KrzysztofHajdamowicz/gbbconnect-go
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=gbbconnect
+Group=gbbconnect
+ExecStart=/usr/local/bin/gbbconnect --config /etc/gbbconnect/gbbconnect.yaml --state-dir /var/lib/gbbconnect run
+Restart=always
+RestartSec=10s
+TimeoutStopSec=40s
+KillSignal=SIGTERM
+
+StateDirectory=gbbconnect
+StateDirectoryMode=0750
+ConfigurationDirectory=gbbconnect
+ConfigurationDirectoryMode=0750
+UMask=0077
+
+# Uncomment for plants using the modbus_serial driver. Some distributions use
+# a different serial-device group, for example uucp.
+# SupplementaryGroups=dialout
+
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+KeyringMode=private
+PrivateTmp=yes
+ProtectHostname=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectClock=yes
+ProtectControlGroups=yes
+ProtectKernelLogs=yes
+ProtectKernelModules=yes
+ProtectKernelTunables=yes
+RemoveIPC=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target
