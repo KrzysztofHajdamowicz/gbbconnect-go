@@ -10,9 +10,87 @@ import (
 	"time"
 
 	"github.com/KrzysztofHajdamowicz/gbbconnect-go/internal/config"
+	"github.com/KrzysztofHajdamowicz/gbbconnect-go/internal/invertertest"
 	"github.com/KrzysztofHajdamowicz/gbbconnect-go/internal/modbus"
 	serial "go.bug.st/serial"
 )
+
+func TestSharedHarnessReadWriteAndFaults(t *testing.T) {
+	t.Parallel()
+
+	t.Run("fragmented read and write", func(t *testing.T) {
+		mock, transport := sharedSerialHarness(
+			t,
+			invertertest.ScenarioFragmented,
+		)
+		read, err := transport.SendRTU(
+			context.Background(),
+			modbus.BuildReadHoldingRegisters(1, 0x0204, 2),
+		)
+		if err != nil {
+			t.Fatalf("read SendRTU() error = %v", err)
+		}
+		wantRead := modbus.AppendCRC([]byte{1, 3, 4, 0, 1, 0, 2})
+		if !bytes.Equal(read, wantRead) {
+			t.Fatalf("read SendRTU() = %X, want %X", read, wantRead)
+		}
+
+		write, err := transport.SendRTU(
+			context.Background(),
+			modbus.BuildWriteMultipleRegisters(
+				1,
+				0x0010,
+				[]byte{0x12, 0x34},
+			),
+		)
+		if err != nil {
+			t.Fatalf("write SendRTU() error = %v", err)
+		}
+		wantWrite := modbus.AppendCRC([]byte{1, 16, 0, 16, 0, 1})
+		if !bytes.Equal(write, wantWrite) {
+			t.Fatalf("write SendRTU() = %X, want %X", write, wantWrite)
+		}
+		if mock.Requests() != 2 {
+			t.Fatalf("mock handled %d requests, want 2", mock.Requests())
+		}
+	})
+
+	t.Run("malformed CRC", func(t *testing.T) {
+		_, transport := sharedSerialHarness(
+			t,
+			invertertest.ScenarioMalformed,
+		)
+		_, err := transport.SendRTU(
+			context.Background(),
+			modbus.BuildReadHoldingRegisters(1, 0, 1),
+		)
+		if !errors.Is(err, ErrWrongCRC) {
+			t.Fatalf("SendRTU() error = %v, want ErrWrongCRC", err)
+		}
+	})
+}
+
+func sharedSerialHarness(
+	t *testing.T,
+	scenario invertertest.Scenario,
+) (*invertertest.Serial, *Transport) {
+	t.Helper()
+	mock := invertertest.NewSerial(t, scenario)
+	settings := config.DefaultSerialPort()
+	settings.Device = "/dev/invertertest"
+	transport := New(config.Plant{SerialPort: settings}, nil)
+	transport.openPort = func(
+		device string,
+		mode *serial.Mode,
+	) (port, error) {
+		mock.CaptureOpen(device, mode)
+		return mock, nil
+	}
+	t.Cleanup(func() {
+		_ = transport.Close()
+	})
+	return mock, transport
+}
 
 func TestTransportReadRoundTripAndSettings(t *testing.T) {
 	t.Parallel()

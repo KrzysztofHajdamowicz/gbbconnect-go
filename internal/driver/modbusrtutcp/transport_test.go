@@ -10,8 +10,101 @@ import (
 	"time"
 
 	"github.com/KrzysztofHajdamowicz/gbbconnect-go/internal/config"
+	"github.com/KrzysztofHajdamowicz/gbbconnect-go/internal/invertertest"
 	"github.com/KrzysztofHajdamowicz/gbbconnect-go/internal/modbus"
 )
+
+func TestSharedHarnessReadWriteAndFaults(t *testing.T) {
+	t.Parallel()
+
+	t.Run("coalesced read and write", func(t *testing.T) {
+		transport := sharedHarnessTransport(
+			t,
+			invertertest.ScenarioCoalesced,
+		)
+		read, err := transport.SendRTU(
+			testContext(t),
+			modbus.BuildReadHoldingRegisters(1, 0, 1),
+		)
+		if err != nil {
+			t.Fatalf("read SendRTU() error = %v", err)
+		}
+		wantRead := modbus.AppendCRC([]byte{1, 3, 2, 0, 1})
+		if !bytes.Equal(read, wantRead) {
+			t.Fatalf("read SendRTU() = %X, want %X", read, wantRead)
+		}
+
+		write, err := transport.SendRTU(
+			testContext(t),
+			modbus.BuildWriteMultipleRegisters(
+				1,
+				0x0010,
+				[]byte{0x12, 0x34},
+			),
+		)
+		if err != nil {
+			t.Fatalf("write SendRTU() error = %v", err)
+		}
+		wantWrite := modbus.AppendCRC([]byte{1, 16, 0, 16, 0, 1})
+		if !bytes.Equal(write, wantWrite) {
+			t.Fatalf("write SendRTU() = %X, want %X", write, wantWrite)
+		}
+	})
+
+	for _, scenario := range []invertertest.Scenario{
+		invertertest.ScenarioFragmented,
+		invertertest.ScenarioCloseOnce,
+		invertertest.ScenarioShortResponseOnce,
+	} {
+		t.Run(string(scenario), func(t *testing.T) {
+			transport := sharedHarnessTransport(t, scenario)
+			got, err := transport.SendRTU(
+				testContext(t),
+				modbus.BuildReadHoldingRegisters(1, 0, 1),
+			)
+			if err != nil {
+				t.Fatalf("SendRTU() error = %v", err)
+			}
+			want := modbus.AppendCRC([]byte{1, 3, 2, 0, 1})
+			if !bytes.Equal(got, want) {
+				t.Fatalf("SendRTU() = %X, want %X", got, want)
+			}
+		})
+	}
+
+	t.Run("malformed CRC", func(t *testing.T) {
+		transport := sharedHarnessTransport(
+			t,
+			invertertest.ScenarioMalformed,
+		)
+		_, err := transport.SendRTU(
+			testContext(t),
+			modbus.BuildReadHoldingRegisters(1, 0, 1),
+		)
+		if !errors.Is(err, ErrWrongCRC) {
+			t.Fatalf("SendRTU() error = %v, want ErrWrongCRC", err)
+		}
+	})
+}
+
+func sharedHarnessTransport(
+	t *testing.T,
+	scenario invertertest.Scenario,
+) *Transport {
+	t.Helper()
+	harness := invertertest.Start(
+		t,
+		invertertest.ProtocolRTUOverTCP,
+		scenario,
+	)
+	transport := New(harness.Plant(), nil)
+	transport.timeout = 100 * time.Millisecond
+	transport.retryDelay = 0
+	t.Cleanup(func() {
+		_ = transport.Close()
+	})
+	return transport
+}
 
 func TestTransportReassemblesFragmentedRead(t *testing.T) {
 	t.Parallel()

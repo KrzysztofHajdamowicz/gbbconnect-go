@@ -136,11 +136,17 @@ Exception path: `resp[8] > 127` with `resp[9]=0x02` -> error
 
 ### Mock inverter (per transport)
 
-- A TCP listener that, for SolarmanV5, validates the request frame and replies
-  with a well-formed V5 response wrapping a canned Modbus response; for Modbus
-  TCP, echoes the transaction id and returns a canned PDU; for RTU-over-TCP,
-  returns a canned RTU frame (optionally fragmented across writes to exercise the
-  reassembly logic); for serial, a pty.
+The reusable registry and harness in `internal/invertertest` exercise every real
+transport through its production `SendRTU` path. Network mocks bind ephemeral
+loopback ports and shut down through `testing.T.Cleanup`; the serial mock
+implements the transport's in-memory port contract. All mocks validate incoming
+RTU requests and derive deterministic read/write responses.
+
+Scenarios cover fragmented and coalesced frames, a zero-byte connection close,
+a truncated response followed by reconnect, malformed frames/CRC, wrong
+Solarman sequence, wrong Modbus TCP transaction id, and Modbus exception
+responses. Integration tests can enumerate independent copies of the scenario
+registry with `invertertest.Registry()`.
 
 ### Mock cloud (MQTT)
 
@@ -170,7 +176,7 @@ Plaintext mode is available for non-production test clients.
       the exact not-found message when missing.
 - [x] LogLevel remote control updates verbosity and persists.
 - [x] Incremental LastLog streaming persists its cursor and handles day rollover.
-- [ ] New transports (RTU-over-TCP, serial) round-trip a read and a write
+- [x] New transports (RTU-over-TCP, serial) round-trip a read and a write
       against their mocks, with CRC validation.
 - [x] Discovery returns serials from a mock dongle responder over UDP.
 - [x] Subnet discovery bounds concurrency and reports reachable dongle ports.

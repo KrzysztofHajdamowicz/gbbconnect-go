@@ -13,9 +13,118 @@ import (
 	"time"
 
 	"github.com/KrzysztofHajdamowicz/gbbconnect-go/internal/config"
+	"github.com/KrzysztofHajdamowicz/gbbconnect-go/internal/invertertest"
 	"github.com/KrzysztofHajdamowicz/gbbconnect-go/internal/logbuf"
 	"github.com/KrzysztofHajdamowicz/gbbconnect-go/internal/modbus"
 )
+
+func TestSharedHarnessReadWriteAndFaults(t *testing.T) {
+	t.Parallel()
+
+	t.Run("fragmented read and write", func(t *testing.T) {
+		transport := sharedHarnessTransport(
+			t,
+			invertertest.ScenarioFragmented,
+		)
+		assertHarnessReadWrite(t, transport)
+	})
+
+	for _, scenario := range []invertertest.Scenario{
+		invertertest.ScenarioCloseOnce,
+		invertertest.ScenarioShortResponseOnce,
+	} {
+		t.Run(string(scenario), func(t *testing.T) {
+			transport := sharedHarnessTransport(t, scenario)
+			got, err := transport.SendRTU(
+				testContext(t),
+				modbus.BuildReadHoldingRegisters(1, 0, 1),
+			)
+			if err != nil {
+				t.Fatalf("SendRTU() error = %v", err)
+			}
+			want := modbus.AppendCRC([]byte{1, 3, 2, 0, 1})
+			if !bytes.Equal(got, want) {
+				t.Fatalf("SendRTU() = %X, want %X", got, want)
+			}
+		})
+	}
+
+	errorScenarios := []struct {
+		scenario invertertest.Scenario
+		want     string
+	}{
+		{
+			scenario: invertertest.ScenarioWrongTransaction,
+			want:     "ModBusTCP: Wrong TransactionId!",
+		},
+		{
+			scenario: invertertest.ScenarioException,
+			want:     "Error response: 2=Illegal Data Address",
+		},
+	}
+	for _, test := range errorScenarios {
+		t.Run(string(test.scenario), func(t *testing.T) {
+			transport := sharedHarnessTransport(t, test.scenario)
+			_, err := transport.SendRTU(
+				testContext(t),
+				modbus.BuildReadHoldingRegisters(1, 0, 1),
+			)
+			if err == nil || err.Error() != test.want {
+				t.Fatalf("SendRTU() error = %v, want %q", err, test.want)
+			}
+		})
+	}
+}
+
+func sharedHarnessTransport(
+	t *testing.T,
+	scenario invertertest.Scenario,
+) *Transport {
+	t.Helper()
+	harness := invertertest.Start(
+		t,
+		invertertest.ProtocolModbusTCP,
+		scenario,
+	)
+	transport := New(harness.Plant(), nil)
+	transport.timeout = 100 * time.Millisecond
+	transport.retryDelay = 0
+	t.Cleanup(func() {
+		_ = transport.Close()
+	})
+	return transport
+}
+
+func assertHarnessReadWrite(t *testing.T, transport *Transport) {
+	t.Helper()
+	read, err := transport.SendRTU(
+		testContext(t),
+		modbus.BuildReadHoldingRegisters(1, 0x009C, 2),
+	)
+	if err != nil {
+		t.Fatalf("read SendRTU() error = %v", err)
+	}
+	wantRead := modbus.AppendCRC([]byte{1, 3, 4, 0, 1, 0, 2})
+	if !bytes.Equal(read, wantRead) {
+		t.Fatalf("read SendRTU() = %X, want %X", read, wantRead)
+	}
+
+	write, err := transport.SendRTU(
+		testContext(t),
+		modbus.BuildWriteMultipleRegisters(
+			1,
+			0x0010,
+			[]byte{0x12, 0x34, 0x56, 0x78},
+		),
+	)
+	if err != nil {
+		t.Fatalf("write SendRTU() error = %v", err)
+	}
+	wantWrite := modbus.AppendCRC([]byte{1, 16, 0, 16, 0, 2})
+	if !bytes.Equal(write, wantWrite) {
+		t.Fatalf("write SendRTU() = %X, want %X", write, wantWrite)
+	}
+}
 
 func TestTransportReadAndWriteRoundTrip(t *testing.T) {
 	t.Parallel()
