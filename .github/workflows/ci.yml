@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  GOLANGCI_LINT_VERSION: v2.12.2
+
+jobs:
+  quality:
+    name: Build, lint, and test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Download modules
+        run: go mod download
+      - name: Build
+        run: go build ./...
+      - name: Vet
+        run: go vet ./...
+      - name: Lint
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: ${{ env.GOLANGCI_LINT_VERSION }}
+      - name: Test with race detector
+        run: go test ./... -race -count=1
+
+  cross-build:
+    name: Cross-compile static binaries
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Build target matrix
+        run: make build-all VERSION=ci
+      - name: Verify artifacts
+        run: |
+          test -f dist/gbbconnect_linux_amd64
+          test -f dist/gbbconnect_linux_arm64
+          test -f dist/gbbconnect_linux_arm_v7
+          test -f dist/gbbconnect_windows_amd64.exe
+          test -f dist/gbbconnect_darwin_arm64
+      - name: Verify static Linux binaries
+        run: |
+          file dist/gbbconnect_linux_amd64 | grep -q "statically linked"
+          file dist/gbbconnect_linux_arm64 | grep -q "statically linked"
+          file dist/gbbconnect_linux_arm_v7 | grep -q "statically linked"
+          if ldd dist/gbbconnect_linux_amd64 2>&1 | grep -qv "not a dynamic executable"; then
+            echo "linux/amd64 artifact is dynamically linked"
+            exit 1
+          fi
+
