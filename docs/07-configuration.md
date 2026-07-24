@@ -158,6 +158,11 @@ HA add-ons present options via `config.yaml` schema and write user values to
   both to validate YAML and to generate/verify the HA options schema. This keeps
   hand-editing safe (editors with schema support) and automation-friendly.
 
+The canonical schema is [`../schema/gbbconnect.schema.json`](../schema/gbbconnect.schema.json).
+The Home Assistant options schema in GC-071 must be derived from these same
+field names, required values, and enums; automated tests keep the driver,
+logging-level, and parity enums synchronized with the Go model.
+
 ## 7. State persistence
 
 The original persists per-plant runtime state to

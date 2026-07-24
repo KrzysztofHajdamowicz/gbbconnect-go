@@ -3,7 +3,7 @@
 - **Epic:** B - Configuration & domain
 - **Type:** Feature
 - **Priority:** High
-- **Status:** TODO
+- **Status:** DONE
 - **Estimate:** 1.5 days
 - **Depends on:** GC-010
 - **Blocks:** GC-040, GC-060, GC-061, GC-014

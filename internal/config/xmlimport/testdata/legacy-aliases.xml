@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Parameters Version="1" UnexpectedParameter="ignored">
+  <Plant Version="1"
+         Number="7"
+         Name="Legacy"
+         DriverNo="1"
+         IsDisabled="1"
+         AddressIP="10.0.0.7"
+         PortNo="502"
+         GbbVictronWeb_PlantId="legacy-id"
+         GbbVictronWeb_PlantToken="legacy-token"
+         GbbVictronWeb_Mqtt_Address="legacy-mqtt.example"
+         GbbVictronWeb_Mqtt_Port="8884"
+         UnexpectedPlant="ignored"/>
+</Parameters>
+

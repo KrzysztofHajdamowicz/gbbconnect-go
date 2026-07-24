@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Parameters Version="1"
+            Server_AutoStart="0"
+            IsVerboseLog="1"
+            IsDriverLog="1"
+            IsDriverLog2="1">
+  <Plant Version="1"
+         Number="1"
+         Name="Any text"
+         DriverNo="0"
+         IsDisabled="0"
+         AddressIP="1.2.3.4"
+         PortNo="8899"
+         SerialNumber="123456"
+         GbbOptimizer_PlantId="plant-id"
+         GbbOptimizer_PlantToken="plant-token"
+         GbbOptimizer_Mqtt_Address="gbboptimizer1-mqtt.gbbsoft.pl"
+         GbbOptimizer_Mqtt_Port="8883"/>
+</Parameters>
+

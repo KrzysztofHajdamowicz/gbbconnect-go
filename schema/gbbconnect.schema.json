@@ -1,0 +1,312 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/KrzysztofHajdamowicz/gbbconnect-go/schema/gbbconnect.schema.json",
+  "title": "gbbconnect-go configuration",
+  "description": "Configuration for the gbbconnect-go MQTT-to-Modbus bridge.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "plants"
+  ],
+  "properties": {
+    "version": {
+      "description": "Configuration format version.",
+      "type": "integer",
+      "const": 1
+    },
+    "runtime": {
+      "$ref": "#/$defs/runtime"
+    },
+    "logging": {
+      "$ref": "#/$defs/logging"
+    },
+    "plants": {
+      "description": "Configured inverter sites.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/plant"
+      }
+    }
+  },
+  "$defs": {
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "debug": {
+          "description": "Use development reconnect timing and verbose diagnostics.",
+          "type": "boolean",
+          "default": false
+        },
+        "clear_old_logs": {
+          "description": "Delete daily logs older than approximately two months.",
+          "type": "boolean",
+          "default": true
+        },
+        "gbb_environment": {
+          "description": "Optional GbbEnvironment response override.",
+          "type": "string",
+          "default": ""
+        }
+      }
+    },
+    "logging": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "level": {
+          "description": "Minimum application logging severity.",
+          "type": "string",
+          "enum": [
+            "error",
+            "warn",
+            "info",
+            "debug"
+          ],
+          "default": "info"
+        },
+        "driver_trace": {
+          "description": "Log decoded Modbus driver activity.",
+          "type": "boolean",
+          "default": false
+        },
+        "driver_trace_raw": {
+          "description": "Log raw transport frames.",
+          "type": "boolean",
+          "default": false
+        },
+        "directory": {
+          "description": "Daily log directory; empty selects the runtime default.",
+          "type": "string",
+          "default": ""
+        }
+      }
+    },
+    "plant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "number",
+        "name",
+        "driver",
+        "cloud"
+      ],
+      "properties": {
+        "number": {
+          "description": "Unique plant number used for state and diagnostics.",
+          "type": "integer"
+        },
+        "name": {
+          "description": "Human-readable plant name.",
+          "type": "string",
+          "minLength": 1
+        },
+        "enabled": {
+          "description": "Whether this plant worker should run.",
+          "type": "boolean",
+          "default": true
+        },
+        "driver": {
+          "description": "Inverter transport implementation.",
+          "type": "string",
+          "enum": [
+            "solarman_v5",
+            "modbus_tcp",
+            "modbus_rtu_tcp",
+            "modbus_serial",
+            "random"
+          ]
+        },
+        "address": {
+          "description": "Network address of the inverter dongle.",
+          "type": "string"
+        },
+        "port": {
+          "description": "Network port of the inverter dongle.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535,
+          "default": 8899
+        },
+        "serial": {
+          "description": "Solarman logger serial number.",
+          "type": "integer"
+        },
+        "serial_port": {
+          "$ref": "#/$defs/serial_port"
+        },
+        "cloud": {
+          "$ref": "#/$defs/cloud"
+        },
+        "sub_inverters": {
+          "description": "Optional inverters routed through other loggers.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/sub_inverter"
+          },
+          "default": []
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "driver": {
+                "const": "solarman_v5"
+              }
+            },
+            "required": [
+              "driver"
+            ]
+          },
+          "then": {
+            "required": [
+              "address",
+              "serial"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "driver": {
+                "enum": [
+                  "modbus_tcp",
+                  "modbus_rtu_tcp"
+                ]
+              }
+            },
+            "required": [
+              "driver"
+            ]
+          },
+          "then": {
+            "required": [
+              "address"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "driver": {
+                "const": "modbus_serial"
+              }
+            },
+            "required": [
+              "driver"
+            ]
+          },
+          "then": {
+            "required": [
+              "serial_port"
+            ]
+          }
+        }
+      ]
+    },
+    "serial_port": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "device": {
+          "description": "Serial device path.",
+          "type": "string"
+        },
+        "baud": {
+          "description": "Serial baud rate.",
+          "type": "integer",
+          "minimum": 1,
+          "default": 9600
+        },
+        "data_bits": {
+          "description": "Serial data bits.",
+          "type": "integer",
+          "minimum": 5,
+          "maximum": 8,
+          "default": 8
+        },
+        "parity": {
+          "description": "Serial parity mode.",
+          "type": "string",
+          "enum": [
+            "none",
+            "even",
+            "odd"
+          ],
+          "default": "none"
+        },
+        "stop_bits": {
+          "description": "Serial stop bits.",
+          "type": "integer",
+          "enum": [
+            1,
+            2
+          ],
+          "default": 1
+        }
+      }
+    },
+    "cloud": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "plant_id": {
+          "description": "GbbOptimizer plant ID and MQTT username.",
+          "type": "string"
+        },
+        "plant_token": {
+          "description": "GbbOptimizer MQTT password; may be supplied by an environment override.",
+          "type": "string"
+        },
+        "mqtt_address": {
+          "description": "GbbOptimizer MQTT broker hostname.",
+          "type": "string",
+          "minLength": 1
+        },
+        "mqtt_port": {
+          "description": "GbbOptimizer MQTT TLS port.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535,
+          "default": 8883
+        },
+        "tls_insecure_skip_verify": {
+          "description": "Disable broker certificate verification for troubleshooting only.",
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "sub_inverter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "serial",
+        "dongle_serial"
+      ],
+      "properties": {
+        "serial": {
+          "description": "Inverter serial used by SubInverterSN routing.",
+          "type": "integer"
+        },
+        "dongle_serial": {
+          "description": "Logger serial used for Solarman framing.",
+          "type": "integer"
+        },
+        "address": {
+          "description": "Network address of the sub-inverter logger.",
+          "type": "string"
+        },
+        "port": {
+          "description": "Network port of the sub-inverter logger.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535,
+          "default": 8899
+        }
+      }
+    }
+  }
+}

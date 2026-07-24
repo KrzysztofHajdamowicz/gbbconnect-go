@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Parameters Version="1"
+            IsVerboseLog="1"
+            IsDriverLog="0"
+            IsDriverLog2="0"
+            ClearOldLogs="1">
+  <Plant Version="1"
+         Number="1"
+         Name="My Main Plant"
+         DriverNo="0"
+         IsDisabled="0"
+         AddressIP="1.2.3.4"
+         PortNo="8899"
+         SerialNumber="123456"
+         GbbOptimizer_PlantId="plant-id"
+         GbbOptimizer_PlantToken="plant-token"
+         GbbOptimizer_Mqtt_Address="gbboptimizer1-mqtt.gbbsoft.pl"
+         GbbOptimizer_Mqtt_Port="8883">
+    <SubInverter Version="1"
+                 AddressIP="1.2.3.5"
+                 PortNo="8899"
+                 SerialNumber="123"
+                 DongleSerialNumber="321"/>
+  </Plant>
+</Parameters>
+
