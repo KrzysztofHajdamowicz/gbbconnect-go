@@ -48,6 +48,12 @@ provided CIDR by attempting a SolarmanV5 probe to each host on the dongle port:
 > minimum it reports reachable dongle ports. Document this limitation in the CLI
 > help.
 
+The current scanner uses the minimum reliable probe: a bounded, cancellable TCP
+connect with a 500 ms per-host timeout. It reports every reachable host, with
+`serial` left unset. A SolarmanV5 request itself requires the logger serial, so
+active serial extraction cannot be assumed when scanning an unknown device;
+use UDP discovery when the serial is required.
+
 ## 3. CLI design
 
 Discovery is a subcommand of the main binary:

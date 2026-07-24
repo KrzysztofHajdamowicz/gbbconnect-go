@@ -3,7 +3,7 @@
 - **Epic:** F - Discovery
 - **Type:** Feature
 - **Priority:** Low
-- **Status:** TODO
+- **Status:** DONE
 - **Estimate:** 1 day
 - **Depends on:** GC-050
 - **Blocks:** GC-052
