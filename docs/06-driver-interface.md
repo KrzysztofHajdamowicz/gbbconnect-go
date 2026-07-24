@@ -35,6 +35,10 @@ type Transport interface {
 // Driver wraps a Transport with Modbus-level helpers and the inter-command
 // timing constraints. Used by local/diagnostic callers.
 type Driver interface {
+    // Explicit, idempotent connection used by the cloud handler so setup
+    // failures can be reported as header-level errors.
+    Connect(ctx context.Context) error
+
     // Cloud bridge path: no extra delay, returns full RTU incl. CRC.
     SendDataToDevice(ctx context.Context, rtu []byte) ([]byte, error)
 

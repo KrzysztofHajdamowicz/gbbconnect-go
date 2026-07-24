@@ -179,9 +179,9 @@ section).
 
 - [x] PascalCase JSON field names; null fields omitted on encode.
 - [x] Lenient decode (trailing commas, case-insensitive LogLevel/hex).
-- [ ] Per-line execution overwrites `Modbus` with the response hex.
-- [ ] Error cascading: first failure nulls this + remaining lines and breaks.
-- [ ] Global failure nulls all lines and sets `Header.Error`.
+- [x] Per-line execution overwrites `Modbus` with the response hex.
+- [x] Error cascading: first failure nulls this + remaining lines and breaks.
+- [x] Global failure nulls all lines and sets `Header.Error`.
 - [ ] Sub-inverter routing by `SubInverterSN` with the exact not-found message.
-- [ ] `GbbVersion` / `GbbEnvironment` set on every response.
-- [ ] Response published QoS 2.
+- [x] `GbbVersion` / `GbbEnvironment` set on every response.
+- [x] Response published QoS 2.

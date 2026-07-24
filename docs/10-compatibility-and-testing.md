@@ -144,7 +144,7 @@ Exception path: `resp[8] > 127` with `resp[9]=0x02` -> error
 - [ ] CRC and RTU header vectors (§3) pass.
 - [ ] SolarmanV5 build + parse vectors (§4) pass, including all negative cases.
 - [ ] Modbus TCP build + parse + exception vectors (§5) pass.
-- [ ] JSON encode/decode + null omission + error cascading (§6) pass.
+- [x] JSON encode/decode + null omission + error cascading (§6) pass.
 - [ ] MQTT: correct client id, topics, QoS (sub 1 / keepalive 1 / response 2),
       60 s keepalive, 5 min backoff.
 - [ ] Sub-inverter routing resolves dongle serial/address/port and errors with

@@ -48,6 +48,8 @@ func (clock *fakeClock) recordedWaits() []time.Duration {
 type fakeTransport struct {
 	mu         sync.Mutex
 	send       func(context.Context, []byte) ([]byte, error)
+	connectErr error
+	connects   int
 	requests   [][]byte
 	active     int
 	maxActive  int
@@ -55,7 +57,31 @@ type fakeTransport struct {
 }
 
 func (transport *fakeTransport) Connect(ctx context.Context) error {
-	return ctx.Err()
+	transport.mu.Lock()
+	defer transport.mu.Unlock()
+	transport.connects++
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return transport.connectErr
+}
+
+func TestDriverConnectDelegatesToTransport(t *testing.T) {
+	t.Parallel()
+
+	wantErr := errors.New("connect failed")
+	transport := &fakeTransport{connectErr: wantErr}
+	inverterDriver := newFacade(transport, newFakeClock())
+
+	if err := inverterDriver.Connect(context.Background()); !errors.Is(err, wantErr) {
+		t.Fatalf("Connect() error = %v, want %v", err, wantErr)
+	}
+	transport.mu.Lock()
+	connects := transport.connects
+	transport.mu.Unlock()
+	if connects != 1 {
+		t.Errorf("transport Connect() calls = %d, want 1", connects)
+	}
 }
 
 func (transport *fakeTransport) SendRTU(

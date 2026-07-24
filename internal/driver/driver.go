@@ -23,6 +23,8 @@ type Transport interface {
 // Driver adds Modbus helpers, transaction serialization, and local-operation
 // timing to a Transport.
 type Driver interface {
+	// Connect eagerly establishes the underlying transport connection.
+	Connect(ctx context.Context) error
 	// SendDataToDevice is the raw cloud path. It neither delays nor interprets
 	// the returned RTU frame.
 	SendDataToDevice(ctx context.Context, rtu []byte) ([]byte, error)
@@ -67,6 +69,13 @@ func newFacade(transport Transport, clock Clock) *facade {
 		transport: transport,
 		executor:  newExecutor(clock),
 	}
+}
+
+func (driver *facade) Connect(ctx context.Context) error {
+	_, err := driver.executor.execute(ctx, 0, false, func() ([]byte, error) {
+		return nil, driver.transport.Connect(ctx)
+	})
+	return err
 }
 
 func (driver *facade) SendDataToDevice(
