@@ -10,6 +10,7 @@ import (
 	"github.com/KrzysztofHajdamowicz/gbbconnect-go/internal/config"
 	"github.com/KrzysztofHajdamowicz/gbbconnect-go/internal/logbuf"
 	"github.com/KrzysztofHajdamowicz/gbbconnect-go/internal/state"
+	"github.com/KrzysztofHajdamowicz/gbbconnect-go/internal/supervisor"
 	"github.com/spf13/cobra"
 )
 
@@ -42,7 +43,7 @@ func defaultRunDependencies() runDependencies {
 		loadConfig:      config.Load,
 		resolveStateDir: state.ResolveDir,
 		newLogger:       logbuf.New,
-		runService:      waitForShutdown,
+		runService:      runSupervisor,
 	}
 }
 
@@ -182,10 +183,15 @@ func configuredLogLevel(level config.LogLevel) (logbuf.Level, error) {
 	}
 }
 
-func waitForShutdown(ctx context.Context, _ serviceOptions) error {
-	if ctx == nil {
-		return errors.New("run context is nil")
+func runSupervisor(ctx context.Context, options serviceOptions) error {
+	service, err := supervisor.New(options.Config, supervisor.Options{
+		Version:  options.Version,
+		StateDir: options.StateDir,
+		LogDir:   options.LogDir,
+		Logger:   options.Logger,
+	})
+	if err != nil {
+		return fmt.Errorf("initialize supervisor: %w", err)
 	}
-	<-ctx.Done()
-	return nil
+	return service.Run(ctx)
 }
