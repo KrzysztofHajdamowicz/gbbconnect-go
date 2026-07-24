@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sync"
 	"testing"
 )
@@ -39,13 +40,7 @@ func TestSaveLoadRoundTrip(t *testing.T) {
 		t.Fatalf("state JSON = %q, want %q", data, expectedJSON)
 	}
 
-	info, err := os.Stat(path)
-	if err != nil {
-		t.Fatalf("stat state file: %v", err)
-	}
-	if info.Mode().Perm() != 0o600 {
-		t.Fatalf("state permissions = %o, want 600", info.Mode().Perm())
-	}
+	assertPrivateFilePermissions(t, path)
 }
 
 func TestLoadMissingReturnsZeroValue(t *testing.T) {
@@ -104,13 +99,7 @@ func TestRuntimeStateRoundTrip(t *testing.T) {
 		t.Fatalf("runtime state JSON = %q, want %q", data, expectedJSON)
 	}
 
-	info, err := os.Stat(path)
-	if err != nil {
-		t.Fatalf("stat runtime state file: %v", err)
-	}
-	if info.Mode().Perm() != 0o600 {
-		t.Fatalf("runtime state permissions = %o, want 600", info.Mode().Perm())
-	}
+	assertPrivateFilePermissions(t, path)
 }
 
 func TestConcurrentDistinctPlants(t *testing.T) {
@@ -312,4 +301,19 @@ func mapEnvironment(values map[string]string) func(string) (string, bool) {
 
 func emptyEnvironment(string) (string, bool) {
 	return "", false
+}
+
+func assertPrivateFilePermissions(t *testing.T, path string) {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		return
+	}
+
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatalf("stat state file: %v", err)
+	}
+	if info.Mode().Perm() != 0o600 {
+		t.Fatalf("state permissions = %o, want 600", info.Mode().Perm())
+	}
 }
