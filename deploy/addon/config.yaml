@@ -1,0 +1,83 @@
+---
+name: "gbbconnect-go"
+version: "0.1.0"
+slug: "gbbconnect_go"
+description: "Unofficial GbbOptimizer MQTT-to-Modbus bridge"
+url: "https://github.com/KrzysztofHajdamowicz/gbbconnect-go"
+image: "ghcr.io/krzysztofhajdamowicz/gbbconnect-go-addon"
+arch:
+  - aarch64
+  - amd64
+  - armv7
+startup: application
+boot: auto
+stage: experimental
+init: false
+uart: true
+host_network: false
+timeout: 40
+options:
+  version: 1
+  runtime:
+    debug: false
+    clear_old_logs: true
+    gbb_environment: "HomeAssistant"
+  logging:
+    level: info
+    driver_trace: false
+    driver_trace_raw: false
+    directory: "/data/logs"
+  plants:
+    - number: 1
+      name: "My plant"
+      enabled: false
+      driver: random
+      address: ""
+      port: 8899
+      serial: 0
+      serial_device: ""
+      serial_baud: 9600
+      serial_data_bits: 8
+      serial_parity: none
+      serial_stop_bits: 1
+      cloud_plant_id: ""
+      cloud_plant_token: ""
+      cloud_mqtt_address: "gbboptimizer1-mqtt.gbbsoft.pl"
+      cloud_mqtt_port: 8883
+      cloud_tls_insecure_skip_verify: false
+  sub_inverters: []
+schema:
+  version: "int(1,1)"
+  runtime:
+    debug: bool
+    clear_old_logs: bool
+    gbb_environment: str
+  logging:
+    level: "list(error|warn|info|debug)"
+    driver_trace: bool
+    driver_trace_raw: bool
+    directory: str
+  plants:
+    - number: int
+      name: str
+      enabled: bool
+      driver: "list(solarman_v5|modbus_tcp|modbus_rtu_tcp|modbus_serial|random)"
+      address: str
+      port: port
+      serial: int
+      serial_device: str
+      serial_baud: int
+      serial_data_bits: "int(5,8)"
+      serial_parity: "list(none|even|odd)"
+      serial_stop_bits: "list(1|2)"
+      cloud_plant_id: str
+      cloud_plant_token: password
+      cloud_mqtt_address: str
+      cloud_mqtt_port: port
+      cloud_tls_insecure_skip_verify: bool
+  sub_inverters:
+    - plant_number: int
+      serial: int
+      dongle_serial: int
+      address: str
+      port: port

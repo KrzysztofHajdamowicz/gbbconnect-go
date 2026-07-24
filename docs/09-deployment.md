@@ -61,27 +61,31 @@ HA add-ons are Docker images plus metadata. Structure (ticket GC-071):
 ```
 addon/
   config.yaml          # add-on manifest + options schema
-  Dockerfile           # FROM the HA base images per arch
-  run.sh               # entrypoint: render config from options, exec binary
+  Dockerfile           # pinned HA base image selected per architecture
+  run.sh / render.jq   # render canonical config from UI options, exec binary
   README.md / DOCS.md
   icon.png / logo.png
 ```
 
 `config.yaml` highlights:
 - `arch: [aarch64, amd64, armv7]`
-- `options:` + `schema:` describing the plant list (mirrors
-  [07-configuration.md](07-configuration.md)).
-- `map:` / `devices:` to expose serial devices if needed for `modbus_serial`.
-- `host_network: true` if UDP discovery / broadcast is needed at runtime
-  (usually only discovery; the bridge itself needs only outbound MQTT, so prefer
-  default networking unless discovery-at-runtime is required).
+- `options:` + `schema:` describing typed plant and sub-inverter lists. Plant
+  fields are flat to respect the Supervisor UI nesting limit, then `render.jq`
+  produces the canonical model from [07](07-configuration.md).
+- `uart: true` maps serial devices for `modbus_serial`.
+- `host_network: false` keeps the daemon isolated by default. A local manifest
+  used for runtime UDP broadcast discovery must explicitly opt into host
+  networking.
 
-`run.sh` reads `/data/options.json` (written by HA from the options schema) and
-either passes it directly to the binary (the loader understands it, see
-[07-configuration.md](07-configuration.md) §6) or renders a YAML file.
+`run.sh` reads `/data/options.json`, renders a mode-0600 canonical JSON file in
+container-only `/tmp`, validates it with `gbbconnect config validate`, and then
+executes the daemon with state under `/data/state`. The Dockerfile follows the
+current BuildKit model and does not use the retired `build.yaml` fallback; see
+the [official Home Assistant app build configuration](https://developers.home-assistant.io/docs/apps/configuration/).
 
 > HA options schema and the JSON Schema (ticket GC-014) should be kept in sync.
-> Provide both an `aarch64`/`amd64`/`armv7` build.
+> An automated Go test validates the defaults and shared enums. Provide
+> `aarch64`/`amd64`/`armv7` builds.
 
 ## 4. systemd (Linux)
 
