@@ -30,6 +30,14 @@ type KeepaliveClient interface {
 // KeepaliveOptions controls compatibility timing.
 type KeepaliveOptions struct {
 	Debug bool
+	Clock LoopClock
+}
+
+// LoopClock controls keepalive cadence. Production callers normally leave it
+// nil; deterministic integration tests can provide a virtual clock.
+type LoopClock interface {
+	Now() time.Time
+	Wait(ctx context.Context, duration time.Duration) error
 }
 
 // KeepaliveLoop owns the MQTT connect, heartbeat, and reconnect lifecycle for
@@ -39,7 +47,7 @@ type KeepaliveLoop struct {
 	client  KeepaliveClient
 	logger  logbuf.Logger
 	debug   bool
-	clock   loopClock
+	clock   LoopClock
 }
 
 // NewKeepaliveLoop creates a per-plant cloud lifecycle loop.
@@ -49,7 +57,11 @@ func NewKeepaliveLoop(
 	logger logbuf.Logger,
 	options KeepaliveOptions,
 ) (*KeepaliveLoop, error) {
-	return newKeepaliveLoop(plantID, client, logger, options, realLoopClock{})
+	clock := options.Clock
+	if clock == nil {
+		clock = realLoopClock{}
+	}
+	return newKeepaliveLoop(plantID, client, logger, options, clock)
 }
 
 func newKeepaliveLoop(
@@ -57,7 +69,7 @@ func newKeepaliveLoop(
 	client KeepaliveClient,
 	logger logbuf.Logger,
 	options KeepaliveOptions,
-	clock loopClock,
+	clock LoopClock,
 ) (*KeepaliveLoop, error) {
 	if strings.TrimSpace(plantID) == "" {
 		return nil, errors.New("keepalive plant id is required")
@@ -163,11 +175,6 @@ func (loop *KeepaliveLoop) wait(ctx context.Context, duration time.Duration) err
 		return fmt.Errorf("wait in MQTT keepalive loop: %w", err)
 	}
 	return nil
-}
-
-type loopClock interface {
-	Now() time.Time
-	Wait(ctx context.Context, duration time.Duration) error
 }
 
 type realLoopClock struct{}

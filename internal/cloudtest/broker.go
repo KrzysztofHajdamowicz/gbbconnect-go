@@ -166,10 +166,25 @@ func (broker *Broker) ExpectResponseJSON(
 	want []byte,
 ) Publication {
 	t.Helper()
+	return broker.ExpectResponseJSONAt(t, plantID, 1, want)
+}
+
+// ExpectResponseJSONAt waits for the numbered canonical QoS 2 response and
+// compares its JSON semantically. Ordinals start at one.
+func (broker *Broker) ExpectResponseJSONAt(
+	t *testing.T,
+	plantID string,
+	ordinal int,
+	want []byte,
+) Publication {
+	t.Helper()
+	if ordinal < 1 {
+		t.Fatalf("MQTT response ordinal must be positive, got %d", ordinal)
+	}
 
 	topic := plantID + "/ModbusInMqtt/fromDevice"
-	publications := broker.waitFor(t, topic, 1, defaultTimeout)
-	got := publications[0]
+	publications := broker.waitFor(t, topic, ordinal, defaultTimeout)
+	got := publications[ordinal-1]
 	if got.QoS != 2 {
 		t.Fatalf("MQTT response QoS = %d, want 2", got.QoS)
 	}

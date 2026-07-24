@@ -164,6 +164,14 @@ Plaintext mode is available for non-production test clients.
   3. asserts keepalive messages appear on `{PlantId}/keepalive` ~every 60 s
      (use a compressed clock / injected ticker in tests).
 
+`TestSupervisorEndToEndCompatibilityFlow` surrounds the real supervisor with
+the TLS broker and Solarman harness. It verifies QoS 2 read responses, error
+cascading, positive and negative sub-inverter routing, exact one-minute virtual
+keepalive cadence, state persistence, and MQTT disconnect. The companion
+`TestSupervisorMultiPlantFaultIsolation` proves that a malformed response for
+one plant does not stall another plant. Both tests are hermetic and run under
+the default race-enabled suite.
+
 ## 8. Acceptance matrix (must pass for "compatible")
 
 - [x] CRC and RTU header vectors (§3) pass.

@@ -115,6 +115,7 @@ type Harness struct {
 	mu          sync.Mutex
 	connections map[net.Conn]struct{}
 	faultUsed   bool
+	requests    int
 	err         error
 	wg          sync.WaitGroup
 }
@@ -161,6 +162,13 @@ func (harness *Harness) Plant() config.Plant {
 	}
 }
 
+// Requests returns the number of complete requests accepted by the mock.
+func (harness *Harness) Requests() int {
+	harness.mu.Lock()
+	defer harness.mu.Unlock()
+	return harness.requests
+}
+
 func (harness *Harness) serve() {
 	defer harness.wg.Done()
 	for {
@@ -196,6 +204,9 @@ func (harness *Harness) handleConnection(connection net.Conn) error {
 		if err != nil {
 			return err
 		}
+		harness.mu.Lock()
+		harness.requests++
+		harness.mu.Unlock()
 		response, err := buildRTUResponse(metadata.rtu)
 		if err != nil {
 			return err

@@ -53,6 +53,20 @@ func TestBrokerTLSResponseAndKeepaliveAssertions(t *testing.T) {
 		t.Fatalf("publish response: %v", err)
 	}
 	broker.ExpectResponseJSON(t, "plant", wantResponse)
+	if err := broker.server.Publish(
+		"plant/ModbusInMqtt/fromDevice",
+		[]byte(`{"OrderId":"second","Lines":[]}`),
+		false,
+		2,
+	); err != nil {
+		t.Fatalf("publish second response: %v", err)
+	}
+	broker.ExpectResponseJSONAt(
+		t,
+		"plant",
+		2,
+		[]byte(`{"Lines":[],"OrderId":"second"}`),
+	)
 
 	for range 3 {
 		if err := broker.server.Publish(

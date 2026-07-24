@@ -3,7 +3,7 @@
 - **Epic:** I - Testing & QA
 - **Type:** Test
 - **Priority:** Medium
-- **Status:** TODO
+- **Status:** DONE
 - **Estimate:** 1.5 days
 - **Depends on:** GC-081, GC-082, GC-061
 - **Blocks:** -

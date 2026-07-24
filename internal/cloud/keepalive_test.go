@@ -8,6 +8,25 @@ import (
 	"time"
 )
 
+func TestNewKeepaliveLoopUsesInjectedClock(t *testing.T) {
+	t.Parallel()
+
+	clock := newFakeLoopClock(time.Now())
+	client := newFakeKeepaliveClient(clock)
+	loop, err := NewKeepaliveLoop(
+		testPlantID,
+		client,
+		nil,
+		KeepaliveOptions{Clock: clock},
+	)
+	if err != nil {
+		t.Fatalf("NewKeepaliveLoop() error = %v", err)
+	}
+	if loop.clock != clock {
+		t.Fatal("NewKeepaliveLoop() ignored injected clock")
+	}
+}
+
 func TestKeepaliveLoopPublishesEveryMinuteFromCycleStart(t *testing.T) {
 	t.Parallel()
 
@@ -249,7 +268,7 @@ func TestKeepaliveLoopValidationAndCancellation(t *testing.T) {
 func mustKeepaliveLoop(
 	t *testing.T,
 	client KeepaliveClient,
-	clock loopClock,
+	clock LoopClock,
 	debug bool,
 ) *KeepaliveLoop {
 	t.Helper()
@@ -319,7 +338,7 @@ type keepalivePublication struct {
 type fakeKeepaliveClient struct {
 	mu sync.Mutex
 
-	clock            loopClock
+	clock            LoopClock
 	connected        bool
 	stayDisconnected bool
 	connectErr       error
@@ -330,7 +349,7 @@ type fakeKeepaliveClient struct {
 	afterPublish     func(publishCount int)
 }
 
-func newFakeKeepaliveClient(clock loopClock) *fakeKeepaliveClient {
+func newFakeKeepaliveClient(clock LoopClock) *fakeKeepaliveClient {
 	return &fakeKeepaliveClient{clock: clock}
 }
 
