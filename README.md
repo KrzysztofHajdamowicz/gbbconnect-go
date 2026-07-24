@@ -13,6 +13,10 @@ To install and configure a plant, start with the
 systemd, every supported transport, discovery, GbbConnect2 migration, secret
 handling, and troubleshooting.
 
+Contributors should start with **[CONTRIBUTING.md](CONTRIBUTING.md)** for the
+clean-checkout workflow, CI contract, compatibility rules, and the concrete
+transport-extension checklist.
+
 ---
 
 ## 1. Why this project exists

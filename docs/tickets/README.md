@@ -193,7 +193,7 @@ it to `IN PROGRESS` / `DONE` (or track in your issue tracker if importing).
 | GC-082 | I | Medium | DONE |
 | GC-083 | I | Medium | DONE |
 | GC-090 | J | Low | DONE |
-| GC-091 | J | Low | TODO |
+| GC-091 | J | Low | DONE |
 
 ## MVP cut
 

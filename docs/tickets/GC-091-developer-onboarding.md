@@ -3,7 +3,7 @@
 - **Epic:** J - Docs
 - **Type:** Docs
 - **Priority:** Low
-- **Status:** TODO
+- **Status:** DONE
 - **Estimate:** 0.5 day
 - **Depends on:** GC-003
 - **Blocks:** -
