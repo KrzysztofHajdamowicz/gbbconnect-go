@@ -74,12 +74,15 @@ Flags:
 
 ```
 Discovered Solarman dongles:
-  IP              MAC                Serial
-  192.168.1.100   AC:1F:0B:xx:xx:xx  1720000000
-  192.168.1.105   AC:1F:0B:yy:yy:yy  4012345678
+  IP              MAC                Serial      Raw
+  192.168.1.100   AC:1F:0B:xx:xx:xx  1720000000  ...
+  192.168.1.105   AC:1F:0B:yy:yy:yy  4012345678  ...
 
 2 dongle(s) found.
 ```
+
+Finding no devices is a successful discovery run: human output reports
+`0 dongle(s) found`, while JSON contains an empty `dongles` array.
 
 ### Output (`--json`)
 

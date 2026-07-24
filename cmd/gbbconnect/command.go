@@ -11,6 +11,13 @@ import (
 )
 
 func newRootCommand(buildVersion string) *cobra.Command {
+	return newRootCommandWithDiscovery(buildVersion, defaultDiscoveryDependencies())
+}
+
+func newRootCommandWithDiscovery(
+	buildVersion string,
+	discoveryDependencies discoveryDependencies,
+) *cobra.Command {
 	root := &cobra.Command{
 		Use:           "gbbconnect",
 		Short:         "MQTT-to-Modbus bridge for GbbOptimizer",
@@ -23,7 +30,7 @@ func newRootCommand(buildVersion string) *cobra.Command {
 
 	root.AddCommand(
 		newStubCommand("run", "Run the MQTT-to-Modbus bridge"),
-		newStubCommand("discover", "Discover supported inverter dongles"),
+		newDiscoverCommand(discoveryDependencies),
 		newImportXMLCommand(),
 		newConfigCommand(),
 		&cobra.Command{
