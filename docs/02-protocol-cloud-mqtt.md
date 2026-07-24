@@ -9,6 +9,9 @@ Authoritative source:
 
 ## 1. Broker & TLS
 
+- **Client library**: `github.com/eclipse/paho.mqtt.golang` (MQTT 3.1.1).
+  This preserves the protocol used by GbbConnect2, supports QoS 1/2, and
+  provides an on-connect hook used to restore the subscription after reconnect.
 - **Host**: per-plant, from config `GbbOptimizer_Mqtt_Address`. Default
   `gbboptimizerX-mqtt.gbbsoft.pl` (the literal `X` is part of the default string
   in the original config default; in practice the cloud provides the real
