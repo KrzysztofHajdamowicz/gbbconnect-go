@@ -3,7 +3,7 @@
 - **Epic:** C - Modbus core
 - **Type:** Feature
 - **Priority:** High
-- **Status:** TODO
+- **Status:** DONE
 - **Estimate:** 0.5 day
 - **Depends on:** GC-020
 - **Blocks:** GC-030
