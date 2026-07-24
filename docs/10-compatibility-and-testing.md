@@ -147,7 +147,7 @@ Exception path: `resp[8] > 127` with `resp[9]=0x02` -> error
 - [x] JSON encode/decode + null omission + error cascading (§6) pass.
 - [ ] MQTT: correct client id, topics, QoS (sub 1 / keepalive 1 / response 2),
       60 s keepalive, 5 min backoff.
-- [ ] Sub-inverter routing resolves dongle serial/address/port and errors with
+- [x] Sub-inverter routing resolves dongle serial/address/port and errors with
       the exact not-found message when missing.
 - [x] LogLevel remote control updates verbosity and persists.
 - [x] Incremental LastLog streaming persists its cursor and handles day rollover.

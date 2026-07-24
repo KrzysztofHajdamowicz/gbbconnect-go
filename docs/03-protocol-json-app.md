@@ -184,6 +184,6 @@ response publish. Cursor state is described in
 - [x] Per-line execution overwrites `Modbus` with the response hex.
 - [x] Error cascading: first failure nulls this + remaining lines and breaks.
 - [x] Global failure nulls all lines and sets `Header.Error`.
-- [ ] Sub-inverter routing by `SubInverterSN` with the exact not-found message.
+- [x] Sub-inverter routing by `SubInverterSN` with the exact not-found message.
 - [x] `GbbVersion` / `GbbEnvironment` set on every response.
 - [x] Response published QoS 2.

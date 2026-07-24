@@ -248,6 +248,173 @@ func TestRequestHandlerGlobalConnectFailureClosesDriver(t *testing.T) {
 	}
 }
 
+func TestRequestHandlerRoutesToSubInverter(t *testing.T) {
+	t.Parallel()
+
+	plant := testHandlerPlant()
+	plant.SubInverters = []config.SubInverter{
+		{
+			Serial:       456,
+			DongleSerial: 654321,
+			Address:      "192.0.2.46",
+			Port:         18899,
+		},
+	}
+	var captured config.Plant
+	publisher := &fakeResponsePublisher{}
+	handler, err := NewRequestHandler(
+		plant,
+		publisher,
+		nil,
+		HandlerOptions{
+			Version:            "1.3.0-go",
+			Environment:        "Test",
+			LogLevelController: noopLogLevelController{},
+			LastLogStreamer:    noopLastLogStreamer{},
+			DriverFactory: func(target config.Plant, _ logbuf.Logger) (driver.Driver, error) {
+				captured = target
+				return &fakeHandlerDriver{}, nil
+			},
+		},
+	)
+	if err != nil {
+		t.Fatalf("NewRequestHandler() error = %v", err)
+	}
+
+	if err := handler.Handle(
+		context.Background(),
+		[]byte(`{"SubInverterSN":" 456 "}`),
+	); err != nil {
+		t.Fatalf("Handle() error = %v", err)
+	}
+	if captured.Address != "192.0.2.46" ||
+		captured.Port != 18899 ||
+		captured.Serial != 654321 {
+		t.Fatalf(
+			"captured target = address %q, port %d, serial %d",
+			captured.Address,
+			captured.Port,
+			captured.Serial,
+		)
+	}
+	if captured.Driver != plant.Driver ||
+		captured.Cloud != plant.Cloud ||
+		captured.Number != plant.Number {
+		t.Fatalf("captured target lost plant settings: %#v", captured)
+	}
+}
+
+func TestRequestHandlerUnknownSubInverterSetsExactGlobalError(t *testing.T) {
+	t.Parallel()
+
+	plant := testHandlerPlant()
+	plant.SubInverters = []config.SubInverter{{
+		Serial:       456,
+		DongleSerial: 654321,
+		Address:      "192.0.2.46",
+		Port:         18899,
+	}}
+	factoryCalls := 0
+	publisher := &fakeResponsePublisher{}
+	handler, err := NewRequestHandler(
+		plant,
+		publisher,
+		nil,
+		HandlerOptions{
+			Version:            "1.3.0-go",
+			Environment:        "Test",
+			LogLevelController: noopLogLevelController{},
+			LastLogStreamer:    noopLastLogStreamer{},
+			DriverFactory: func(config.Plant, logbuf.Logger) (driver.Driver, error) {
+				factoryCalls++
+				return &fakeHandlerDriver{}, nil
+			},
+		},
+	)
+	if err != nil {
+		t.Fatalf("NewRequestHandler() error = %v", err)
+	}
+
+	payload := []byte(`{"SubInverterSN":" 999 ","Lines":[
+		{"LineNo":0,"Modbus":"010300000001840A"},
+		{"LineNo":1,"Modbus":"010300010001D5CA"}
+	]}`)
+	if err := handler.Handle(context.Background(), payload); err != nil {
+		t.Fatalf("Handle() error = %v", err)
+	}
+	if factoryCalls != 0 {
+		t.Fatalf("driver factory calls = %d, want 0", factoryCalls)
+	}
+
+	response := decodePublishedHeader(t, publisher.singleMessage(t).payload)
+	const wantError = "Inverter SerialNumber not found:  999  on Slave Inverters list!"
+	if got := dereference(response.Error); got != wantError {
+		t.Fatalf("Header.Error = %q, want %q", got, wantError)
+	}
+	for index, line := range response.Lines {
+		if line.Modbus != nil {
+			t.Errorf("line %d Modbus = %v, want nil", index, line.Modbus)
+		}
+	}
+}
+
+func TestRequestHandlerEmptySubInverterUsesPrimaryTarget(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		payload []byte
+	}{
+		{name: "absent", payload: []byte(`{}`)},
+		{name: "empty", payload: []byte(`{"SubInverterSN":""}`)},
+		{name: "whitespace", payload: []byte(`{"SubInverterSN":" \t "}`)},
+	}
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			plant := testHandlerPlant()
+			var captured config.Plant
+			handler, err := NewRequestHandler(
+				plant,
+				&fakeResponsePublisher{},
+				nil,
+				HandlerOptions{
+					Version:            "1.3.0-go",
+					Environment:        "Test",
+					LogLevelController: noopLogLevelController{},
+					LastLogStreamer:    noopLastLogStreamer{},
+					DriverFactory: func(
+						target config.Plant,
+						_ logbuf.Logger,
+					) (driver.Driver, error) {
+						captured = target
+						return &fakeHandlerDriver{}, nil
+					},
+				},
+			)
+			if err != nil {
+				t.Fatalf("NewRequestHandler() error = %v", err)
+			}
+
+			if err := handler.Handle(context.Background(), test.payload); err != nil {
+				t.Fatalf("Handle() error = %v", err)
+			}
+			if captured.Address != plant.Address ||
+				captured.Port != plant.Port ||
+				captured.Serial != plant.Serial {
+				t.Fatalf(
+					"captured target = address %q, port %d, serial %d",
+					captured.Address,
+					captured.Port,
+					captured.Serial,
+				)
+			}
+		})
+	}
+}
+
 func TestRequestHandlerIgnoresNilPayloadAndRejectsMalformedJSON(t *testing.T) {
 	t.Parallel()
 

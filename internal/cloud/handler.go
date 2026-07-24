@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"runtime"
+	"strconv"
 	"strings"
 
 	"github.com/KrzysztofHajdamowicz/gbbconnect-go/internal/config"
@@ -191,7 +192,13 @@ func (handler *RequestHandler) prepareLastLog(
 }
 
 func (handler *RequestHandler) execute(ctx context.Context, header *protocol.Header) {
-	inverterDriver, err := handler.newDriver(handler.plant, handler.logger)
+	target, err := handler.resolveTarget(header.SubInverterSN)
+	if err != nil {
+		setGlobalError(header, err)
+		return
+	}
+
+	inverterDriver, err := handler.newDriver(target, handler.logger)
 	if err != nil {
 		setGlobalError(header, err)
 		return
@@ -233,6 +240,31 @@ func (handler *RequestHandler) execute(ctx context.Context, header *protocol.Hea
 		clearModbus(header.Lines[index:])
 		break
 	}
+}
+
+func (handler *RequestHandler) resolveTarget(
+	subInverterSerial *string,
+) (config.Plant, error) {
+	target := handler.plant
+	if subInverterSerial == nil || strings.TrimSpace(*subInverterSerial) == "" {
+		return target, nil
+	}
+
+	trimmedSerial := strings.TrimSpace(*subInverterSerial)
+	for _, subInverter := range handler.plant.SubInverters {
+		if strconv.FormatInt(subInverter.Serial, 10) != trimmedSerial {
+			continue
+		}
+		target.Address = subInverter.Address
+		target.Port = subInverter.Port
+		target.Serial = subInverter.DongleSerial
+		return target, nil
+	}
+	//nolint:staticcheck // The compatibility contract requires this exact text.
+	return config.Plant{}, fmt.Errorf(
+		"Inverter SerialNumber not found: %s on Slave Inverters list!",
+		*subInverterSerial,
+	)
 }
 
 func setGlobalError(header *protocol.Header, err error) {
