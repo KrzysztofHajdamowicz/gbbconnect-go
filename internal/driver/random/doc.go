@@ -1,5 +1,5 @@
-// Package solarmanv5 implements the Solarman V5 transport.
-package solarmanv5
+// Package random implements the debug-only random inverter transport.
+package random
 
 import (
 	"github.com/KrzysztofHajdamowicz/gbbconnect-go/internal/config"
@@ -7,14 +7,14 @@ import (
 	"github.com/KrzysztofHajdamowicz/gbbconnect-go/internal/logbuf"
 )
 
-// Transport is the Solarman V5 transport implementation.
+// Transport is the debug-only random transport implementation.
 type Transport struct {
 	*transportstub.Transport
 }
 
-// New constructs a Solarman V5 transport.
+// New constructs a debug-only random transport.
 func New(plant config.Plant, logger logbuf.Logger) *Transport {
 	return &Transport{
-		Transport: transportstub.New(config.DriverSolarmanV5, plant, logger),
+		Transport: transportstub.New(config.DriverRandom, plant, logger),
 	}
 }

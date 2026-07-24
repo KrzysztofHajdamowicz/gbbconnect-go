@@ -165,7 +165,7 @@ it to `IN PROGRESS` / `DONE` (or track in your issue tracker if importing).
 | GC-014 | B | Medium | DONE |
 | GC-020 | C | High | DONE |
 | GC-021 | C | High | DONE |
-| GC-030 | D | High | TODO |
+| GC-030 | D | High | DONE |
 | GC-031 | D | High | TODO |
 | GC-032 | D | High | TODO |
 | GC-033 | D | Medium | TODO |
