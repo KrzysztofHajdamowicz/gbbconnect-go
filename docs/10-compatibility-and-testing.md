@@ -153,7 +153,7 @@ Exception path: `resp[8] > 127` with `resp[9]=0x02` -> error
 - [x] Incremental LastLog streaming persists its cursor and handles day rollover.
 - [ ] New transports (RTU-over-TCP, serial) round-trip a read and a write
       against their mocks, with CRC validation.
-- [ ] Discovery returns serials from a mock dongle responder on UDP 48899.
+- [x] Discovery returns serials from a mock dongle responder over UDP.
 - [ ] Graceful shutdown persists state and disconnects MQTT.
 
 ## 9. Manual / live validation (optional, pre-release)
