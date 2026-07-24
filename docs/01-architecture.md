@@ -167,8 +167,9 @@ Process startup (mirrors
 2. Load per-plant state (log streaming positions).
 3. Start the supervisor; start a worker per enabled plant.
 4. Block until a termination signal (SIGINT/SIGTERM, or Windows service stop).
-5. On shutdown: cancel context, disconnect MQTT clients gracefully, persist
-   state, exit 0.
+5. On shutdown: stop accepting requests, disconnect MQTT clients, allow
+   in-flight requests up to 30 seconds to finish, persist state, and exit 0.
+   A second termination signal forces an immediate exit.
 
 The original supports a `--dont-wait-for-key` console flag; the Go version runs
 as a foreground daemon by default (no key wait), which is the correct behaviour

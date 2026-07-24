@@ -17,10 +17,11 @@ import (
 
 // Options supplies the process resources shared by all plant workers.
 type Options struct {
-	Version  string
-	StateDir string
-	LogDir   string
-	Logger   *logbuf.Runtime
+	Version       string
+	StateDir      string
+	LogDir        string
+	Logger        *logbuf.Runtime
+	ShutdownGrace time.Duration
 }
 
 type plantClient interface {
@@ -63,7 +64,12 @@ type Supervisor struct {
 	logLevel cloud.LogLevelController
 	lastLog  cloud.LastLogStreamer
 	deps     dependencies
+	shutdown chan struct{}
+	stopOnce sync.Once
 }
+
+// DefaultShutdownGrace bounds the time allowed for in-flight cloud requests.
+const DefaultShutdownGrace = 30 * time.Second
 
 // New builds the shared runtime resources used by plant workers.
 func New(configuration config.Config, options Options) (*Supervisor, error) {
@@ -90,6 +96,12 @@ func newSupervisor(
 		deps.wait == nil {
 		return nil, errors.New("supervisor dependencies are incomplete")
 	}
+	if options.ShutdownGrace < 0 {
+		return nil, errors.New("supervisor shutdown grace must not be negative")
+	}
+	if options.ShutdownGrace == 0 {
+		options.ShutdownGrace = DefaultShutdownGrace
+	}
 
 	store, err := state.New(options.StateDir)
 	if err != nil {
@@ -115,6 +127,7 @@ func newSupervisor(
 		logLevel: logLevel,
 		lastLog:  lastLog,
 		deps:     deps,
+		shutdown: make(chan struct{}),
 	}, nil
 }
 
@@ -124,7 +137,12 @@ func (supervisor *Supervisor) Run(ctx context.Context) error {
 		return errors.New("supervisor context is nil")
 	}
 
+	runCtx, cancelWorkers := context.WithCancel(ctx)
+	defer cancelWorkers()
+
 	var workers sync.WaitGroup
+	var errorMu sync.Mutex
+	var workerErrors []error
 	for _, plant := range supervisor.config.Plants {
 		plantLogger := supervisor.logger.With(
 			"plant_number", plant.Number,
@@ -144,24 +162,42 @@ func (supervisor *Supervisor) Run(ctx context.Context) error {
 		workers.Add(1)
 		go func() {
 			defer workers.Done()
-			supervisor.runPlant(ctx, plant, plantLogger)
+			if err := supervisor.runPlant(runCtx, plant, plantLogger); err != nil {
+				errorMu.Lock()
+				workerErrors = append(workerErrors, err)
+				errorMu.Unlock()
+			}
 		}()
 	}
 
-	<-ctx.Done()
+	select {
+	case <-ctx.Done():
+	case <-supervisor.shutdown:
+	}
+	cancelWorkers()
 	workers.Wait()
-	return nil
+	return errors.Join(workerErrors...)
+}
+
+// Shutdown requests the same graceful path used by process cancellation. It is
+// safe to call repeatedly and is the hook used by service integrations.
+func (supervisor *Supervisor) Shutdown() {
+	supervisor.stopOnce.Do(func() {
+		close(supervisor.shutdown)
+	})
 }
 
 func (supervisor *Supervisor) runPlant(
 	ctx context.Context,
 	plant config.Plant,
 	logger logbuf.Logger,
-) {
+) error {
+	var terminalError error
 	for ctx.Err() == nil {
 		err := supervisor.safePlantCycle(ctx, plant, logger)
 		if ctx.Err() != nil {
-			return
+			terminalError = err
+			break
 		}
 		if err != nil {
 			logger.Error("plant worker cycle failed", "error", err)
@@ -178,9 +214,13 @@ func (supervisor *Supervisor) runPlant(
 			if ctx.Err() == nil {
 				logger.Error("plant worker backoff failed", "error", err)
 			}
-			return
+			break
 		}
 	}
+	return errors.Join(
+		terminalError,
+		supervisor.persistPlantState(plant),
+	)
 }
 
 func (supervisor *Supervisor) safePlantCycle(
@@ -214,6 +254,8 @@ func (supervisor *Supervisor) runPlantCycle(
 	}
 	cycleCtx, cancelCycle := context.WithCancel(ctx)
 	defer cancelCycle()
+	requestCtx, cancelRequests := context.WithCancel(context.WithoutCancel(ctx))
+	defer cancelRequests()
 
 	handler, err := supervisor.deps.newHandler(
 		plant,
@@ -233,10 +275,15 @@ func (supervisor *Supervisor) runPlantCycle(
 		return errors.New("request handler factory returned nil")
 	}
 
+	requests := newRequestGate()
 	panicSignal := make(chan error, 1)
 	if err := client.SubscribeContext(
 		cycleCtx,
 		func(_ string, payload []byte) {
+			if !requests.begin() {
+				return
+			}
+			defer requests.done()
 			defer func() {
 				if recovered := recover(); recovered != nil {
 					select {
@@ -245,8 +292,8 @@ func (supervisor *Supervisor) runPlantCycle(
 					}
 				}
 			}()
-			if err := handler.Handle(cycleCtx, payload); err != nil &&
-				cycleCtx.Err() == nil {
+			if err := handler.Handle(requestCtx, payload); err != nil &&
+				requestCtx.Err() == nil {
 				logger.Error("cloud request failed", "error", err)
 			}
 		},
@@ -281,24 +328,72 @@ func (supervisor *Supervisor) runPlantCycle(
 
 	select {
 	case err := <-lifecycleDone:
+		requests.close()
+		if ctx.Err() != nil {
+			supervisor.finishPlantShutdown(
+				logger,
+				requests,
+				cancelRequests,
+			)
+			return nil
+		}
+		cancelRequests()
+		if !requests.wait(supervisor.options.ShutdownGrace) {
+			logger.Warn("request did not stop before worker restart")
+		}
 		if err != nil {
 			return err
 		}
-		if ctx.Err() != nil {
-			return nil
-		}
 		return errors.New("MQTT lifecycle stopped unexpectedly")
 	case err := <-panicSignal:
+		requests.close()
 		cancelCycle()
 		client.Disconnect()
 		<-lifecycleDone
+		cancelRequests()
+		if !requests.wait(supervisor.options.ShutdownGrace) {
+			logger.Warn("request did not stop after handler panic")
+		}
 		return err
 	case <-ctx.Done():
+		requests.close()
 		cancelCycle()
 		client.Disconnect()
 		<-lifecycleDone
+		supervisor.finishPlantShutdown(
+			logger,
+			requests,
+			cancelRequests,
+		)
 		return nil
 	}
+}
+
+func (supervisor *Supervisor) finishPlantShutdown(
+	logger logbuf.Logger,
+	requests *requestGate,
+	cancelRequests context.CancelFunc,
+) {
+	if !requests.wait(supervisor.options.ShutdownGrace) {
+		logger.Warn(
+			"shutdown grace expired; cancelling in-flight requests",
+			"grace", supervisor.options.ShutdownGrace,
+		)
+		cancelRequests()
+	} else {
+		cancelRequests()
+	}
+}
+
+func (supervisor *Supervisor) persistPlantState(plant config.Plant) error {
+	current, err := supervisor.store.Load(plant.Number)
+	if err != nil {
+		return fmt.Errorf("load final state for plant %d: %w", plant.Number, err)
+	}
+	if err := supervisor.store.Save(plant.Number, current); err != nil {
+		return fmt.Errorf("save final state for plant %d: %w", plant.Number, err)
+	}
+	return nil
 }
 
 func defaultDependencies() dependencies {
@@ -337,6 +432,50 @@ func waitContext(ctx context.Context, duration time.Duration) error {
 		return nil
 	case <-ctx.Done():
 		return ctx.Err()
+	}
+}
+
+type requestGate struct {
+	mu        sync.Mutex
+	accepting bool
+	active    sync.WaitGroup
+}
+
+func newRequestGate() *requestGate {
+	return &requestGate{accepting: true}
+}
+
+func (gate *requestGate) begin() bool {
+	gate.mu.Lock()
+	defer gate.mu.Unlock()
+	if !gate.accepting {
+		return false
+	}
+	gate.active.Add(1)
+	return true
+}
+
+func (gate *requestGate) done() {
+	gate.active.Done()
+}
+
+func (gate *requestGate) close() {
+	gate.mu.Lock()
+	gate.accepting = false
+	gate.mu.Unlock()
+}
+
+func (gate *requestGate) wait(timeout time.Duration) bool {
+	done := make(chan struct{})
+	go func() {
+		gate.active.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+		return true
+	case <-time.After(timeout):
+		return false
 	}
 }
 

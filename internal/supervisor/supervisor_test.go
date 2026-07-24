@@ -4,7 +4,11 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
+	"strconv"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -318,6 +322,110 @@ func TestSupervisorRecoversMessageHandlerPanicAndRestartsWorker(t *testing.T) {
 	}
 }
 
+func TestSupervisorGracefullyFinishesInflightRequestAndPersistsState(t *testing.T) {
+	t.Parallel()
+
+	client := &fakePlantClient{}
+	started := make(chan struct{}, 1)
+	requestStarted := make(chan struct{}, 1)
+	releaseRequest := make(chan struct{})
+	var handled atomic.Int32
+	deps := testDependencies()
+	deps.newClient = func(config.Cloud, logbuf.Logger) (plantClient, error) {
+		return client, nil
+	}
+	deps.newHandler = func(
+		config.Plant,
+		cloud.ResponsePublisher,
+		logbuf.Logger,
+		cloud.HandlerOptions,
+	) (requestProcessor, error) {
+		return processorFunc(func(context.Context, []byte) error {
+			handled.Add(1)
+			requestStarted <- struct{}{}
+			<-releaseRequest
+			return nil
+		}), nil
+	}
+	deps.newLifecycle = blockingLifecycle(started)
+
+	service := newTestSupervisor(t, config.Config{
+		Plants: []config.Plant{testPlant(1, "plant-one")},
+	}, deps)
+	service.options.ShutdownGrace = time.Second
+	done := runAsync(service, context.Background())
+	receive(t, started)
+
+	go client.deliver([]byte(`{"Lines":[]}`))
+	receive(t, requestStarted)
+	service.Shutdown()
+	waitForDisconnect(t, client)
+
+	client.deliver([]byte(`{"Lines":[]}`))
+	if got := handled.Load(); got != 1 {
+		t.Fatalf("handled requests after shutdown = %d, want 1", got)
+	}
+	select {
+	case err := <-done:
+		t.Fatalf("Run() returned before in-flight request completed: %v", err)
+	case <-time.After(25 * time.Millisecond):
+	}
+
+	close(releaseRequest)
+	if err := receive(t, done); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	assertPlantStateExists(t, service, 1)
+}
+
+func TestSupervisorCancelsInflightRequestAfterGraceExpires(t *testing.T) {
+	t.Parallel()
+
+	client := &fakePlantClient{}
+	started := make(chan struct{}, 1)
+	requestStarted := make(chan struct{}, 1)
+	requestCancelled := make(chan struct{}, 1)
+	deps := testDependencies()
+	deps.newClient = func(config.Cloud, logbuf.Logger) (plantClient, error) {
+		return client, nil
+	}
+	deps.newHandler = func(
+		config.Plant,
+		cloud.ResponsePublisher,
+		logbuf.Logger,
+		cloud.HandlerOptions,
+	) (requestProcessor, error) {
+		return processorFunc(func(ctx context.Context, _ []byte) error {
+			requestStarted <- struct{}{}
+			<-ctx.Done()
+			requestCancelled <- struct{}{}
+			return ctx.Err()
+		}), nil
+	}
+	deps.newLifecycle = blockingLifecycle(started)
+
+	service := newTestSupervisor(t, config.Config{
+		Plants: []config.Plant{testPlant(1, "plant-one")},
+	}, deps)
+	service.options.ShutdownGrace = 50 * time.Millisecond
+	done := runAsync(service, context.Background())
+	receive(t, started)
+
+	go client.deliver([]byte(`{"Lines":[]}`))
+	receive(t, requestStarted)
+	service.Shutdown()
+	select {
+	case <-requestCancelled:
+		t.Fatal("request was cancelled before shutdown grace elapsed")
+	case <-time.After(20 * time.Millisecond):
+	}
+	receive(t, requestCancelled)
+	if err := receive(t, done); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	assertPlantStateExists(t, service, 1)
+}
+
 func TestSupervisorValidatesOptionsAndContext(t *testing.T) {
 	t.Parallel()
 
@@ -336,6 +444,15 @@ func TestSupervisorValidatesOptionsAndContext(t *testing.T) {
 	if _, err := newSupervisor(config.Config{}, Options{}, testDependencies()); err == nil {
 		t.Fatal("newSupervisor() without options error = nil")
 	}
+	invalidGrace := options
+	invalidGrace.ShutdownGrace = -time.Second
+	if _, err := newSupervisor(
+		config.Config{},
+		invalidGrace,
+		testDependencies(),
+	); err == nil {
+		t.Fatal("newSupervisor() negative shutdown grace error = nil")
+	}
 	service, err := newSupervisor(config.Config{}, options, testDependencies())
 	if err != nil {
 		t.Fatalf("newSupervisor() error = %v", err)
@@ -343,6 +460,56 @@ func TestSupervisorValidatesOptionsAndContext(t *testing.T) {
 	//nolint:staticcheck // Exercise the public API's defensive nil-context guard.
 	if err := service.Run(nil); err == nil {
 		t.Fatal("Run(nil) error = nil")
+	}
+}
+
+func blockingLifecycle(
+	started chan<- struct{},
+) func(
+	string,
+	cloud.KeepaliveClient,
+	logbuf.Logger,
+	cloud.KeepaliveOptions,
+) (workerLifecycle, error) {
+	return func(
+		string,
+		cloud.KeepaliveClient,
+		logbuf.Logger,
+		cloud.KeepaliveOptions,
+	) (workerLifecycle, error) {
+		return lifecycleFunc(func(ctx context.Context) error {
+			started <- struct{}{}
+			<-ctx.Done()
+			return nil
+		}), nil
+	}
+}
+
+func waitForDisconnect(t *testing.T, client *fakePlantClient) {
+	t.Helper()
+	deadline := time.After(time.Second)
+	ticker := time.NewTicker(time.Millisecond)
+	defer ticker.Stop()
+	for {
+		if client.disconnectCount() > 0 {
+			return
+		}
+		select {
+		case <-ticker.C:
+		case <-deadline:
+			t.Fatal("client was not disconnected")
+		}
+	}
+}
+
+func assertPlantStateExists(t *testing.T, service *Supervisor, plantNumber int) {
+	t.Helper()
+	path := filepath.Join(
+		service.options.StateDir,
+		"plant-"+strconv.Itoa(plantNumber)+".json",
+	)
+	if _, err := os.Stat(path); err != nil {
+		t.Fatalf("final plant state %q was not persisted: %v", path, err)
 	}
 }
 
@@ -491,6 +658,12 @@ func (client *fakePlantClient) deliver(payload []byte) {
 		panic("message delivered before subscription")
 	}
 	handler(cloud.ToDeviceTopic("test"), payload)
+}
+
+func (client *fakePlantClient) disconnectCount() int {
+	client.mu.Lock()
+	defer client.mu.Unlock()
+	return client.disconnects
 }
 
 type processorFunc func(context.Context, []byte) error

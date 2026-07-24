@@ -155,7 +155,7 @@ Exception path: `resp[8] > 127` with `resp[9]=0x02` -> error
       against their mocks, with CRC validation.
 - [x] Discovery returns serials from a mock dongle responder over UDP.
 - [x] Subnet discovery bounds concurrency and reports reachable dongle ports.
-- [ ] Graceful shutdown persists state and disconnects MQTT.
+- [x] Graceful shutdown persists state and disconnects MQTT.
 
 ## 9. Manual / live validation (optional, pre-release)
 

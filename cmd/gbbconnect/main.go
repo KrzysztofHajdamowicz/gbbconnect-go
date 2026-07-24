@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 )
@@ -8,7 +9,13 @@ import (
 var version = "dev"
 
 func main() {
-	if err := newRootCommand(version).Execute(); err != nil {
+	ctx, stopSignals := newShutdownContext(
+		context.Background(),
+		defaultShutdownSignalDependencies(),
+	)
+	defer stopSignals()
+
+	if err := newRootCommand(version).ExecuteContext(ctx); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
