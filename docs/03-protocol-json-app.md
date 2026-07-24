@@ -45,7 +45,7 @@ Authoritative sources:
 - Field names use **PascalCase** exactly as above (`LineNo`, `Modbus`, etc.). In
   Go, set explicit JSON tags; do not rely on Go's default lowercasing.
 - `Modbus` hex strings are **uppercase, no separators** (e.g.
-  `0103009C0003D5CA`). See [05-protocol-modbus.md](05-protocol-modbus.md) and
+  `0103009C0003C5E5`). See [05-protocol-modbus.md](05-protocol-modbus.md) and
   the hex codec in
   [`GbbLibSmall/Convert.cs`](../../GbbLibSmall/Convert.cs). On decode, accept any
   case; on encode, emit uppercase.
@@ -56,7 +56,7 @@ Authoritative sources:
 {
   "OrderId": "read-batch-001",
   "Lines": [
-    { "LineNo": 1, "Modbus": "0103009C0003D5CA" },
+    { "LineNo": 1, "Modbus": "0103009C0003C5E5" },
     { "LineNo": 2, "Modbus": "0103009F0001D4C8" }
   ]
 }

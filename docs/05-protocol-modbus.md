@@ -70,8 +70,8 @@ func CRC16(data []byte) (lo, hi byte) {
 > then fill them. Golden vectors are in
 > [10-compatibility-and-testing.md](10-compatibility-and-testing.md).
 
-Known good vector: `01 03 00 9C 00 03` -> CRC `D5 CA` (full frame
-`0103009C0003D5CA`).
+Known good vector, verified against the original `GetCRC` algorithm:
+`01 03 00 9C 00 03` -> CRC `C5 E5` (full frame `0103009C0003C5E5`).
 
 ## 3. Hex string codec
 

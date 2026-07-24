@@ -3,7 +3,7 @@
 - **Epic:** C - Modbus core
 - **Type:** Feature
 - **Priority:** High
-- **Status:** TODO
+- **Status:** DONE
 - **Estimate:** 1 day
 - **Depends on:** GC-001
 - **Blocks:** GC-021, GC-030, GC-031, GC-032, GC-033, GC-034, GC-080
@@ -37,8 +37,8 @@ to the original.
 
 ## Acceptance criteria
 
-- `CRC16` of `01 03 00 9C 00 03` (with 2-byte CRC slot) yields `D5 CA`.
-- `BuildReadHoldingRegisters(1, 0x009C, 3)` == `0103009C0003D5CA`.
+- `CRC16` of `01 03 00 9C 00 03` (with 2-byte CRC slot) yields `C5 E5`.
+- `BuildReadHoldingRegisters(1, 0x009C, 3)` == `0103009C0003C5E5`.
 - Hex round-trip: bytes <-> uppercase string; odd-length decode errors.
 - Write header matches `CreateWriteHeader` layout for a sample.
 

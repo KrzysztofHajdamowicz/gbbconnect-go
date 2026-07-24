@@ -35,7 +35,7 @@ wins**. Known discrepancies to watch:
 
 | Input (hex, full frame incl. CRC slot or PDU) | CRC `lo hi` |
 |----------------------------------------------|-------------|
-| `01 03 00 9C 00 03` | `D5 CA` |
+| `01 03 00 9C 00 03` | `C5 E5` |
 
 CRC is computed over all bytes except the trailing 2 (the CRC slot). Validate by
 recomputing and comparing the last two bytes. Implementers should add more
@@ -45,17 +45,17 @@ vectors by capturing real frames; the function under test is in
 ### Read header
 
 `CreateReadHeader(unit=1, start=0x009C, len=3, fn=3)` ->
-`01 03 00 9C 00 03 D5 CA`.
+`01 03 00 9C 00 03 C5 E5`.
 
 ### Hex codec
 
-- `[]byte{0x01,0x03,0x00,0x9C,0x00,0x03,0xD5,0xCA}` <-> `"0103009C0003D5CA"`.
+- `[]byte{0x01,0x03,0x00,0x9C,0x00,0x03,0xC5,0xE5}` <-> `"0103009C0003C5E5"`.
 - Encode is uppercase, no separators; decode requires even length.
 
 ## 4. Golden vectors: SolarmanV5
 
 Inputs: dongle serial `0x12345678` (decimal 305419896), sequence `0x2A`, inner
-RTU `01 03 00 9C 00 03 D5 CA`.
+RTU `01 03 00 9C 00 03 C5 E5`.
 
 Expected request frame (checksum byte computed per spec):
 ```
@@ -79,7 +79,7 @@ PayloadLength + 13` each raise the corresponding error.
 
 ## 5. Golden vectors: Modbus TCP
 
-Inner RTU `01 03 00 9C 00 03 D5 CA`, transaction id `0x0001`.
+Inner RTU `01 03 00 9C 00 03 C5 E5`, transaction id `0x0001`.
 
 Expected MBAP send buffer (length = `len(rtu) + 6 - 2 = 12`):
 ```

@@ -192,12 +192,12 @@ See [08-discovery.md](08-discovery.md) for the CLI built on top of this.
 Reading 3 registers (start 0x009C=156) from unit 1, dongle serial `0x12345678`,
 sequence 0x2A:
 
-Request Modbus RTU: `01 03 00 9C 00 03 D5 CA`
+Request Modbus RTU: `01 03 00 9C 00 03 C5 E5`
 
 V5 frame:
 ```
 A5 17 00 10 45 2A 00 78 56 34 12 02 00 00 00 00 00 00 00 00 00 00 00 00 00
-01 03 00 9C 00 03 D5 CA <checksum> 15
+01 03 00 9C 00 03 C5 E5 <checksum> 15
 ```
 - `17 00` = length = 8 + 15 = 23 (0x0017) little-endian.
 - `2A 00` = seq 0x2A, padding 0.

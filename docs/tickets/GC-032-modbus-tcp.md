@@ -40,7 +40,7 @@ send and rebuilding it on receive.
 
 ## Acceptance criteria
 
-- Send buffer for `0103009C0003D5CA`, tid `0x0001` matches
+- Send buffer for `0103009C0003C5E5`, tid `0x0001` matches
   [10](../10-compatibility-and-testing.md) §5 (length `00 06`, PDU without CRC).
 - A synthetic response `... 01 03 02 00 FF` returns
   `01 03 02 00 FF <crc>` with correct CRC.
