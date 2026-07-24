@@ -113,7 +113,10 @@ func New(options Options) (*Runtime, error) {
 		})
 	}
 
-	runtime.base = &logger{inner: slog.New(fanoutHandler(handlers))}
+	runtime.base = &logger{
+		inner:   slog.New(fanoutHandler(handlers)),
+		runtime: runtime,
+	}
 	return runtime, nil
 }
 
@@ -209,7 +212,8 @@ func (r *Runtime) With(attrs ...any) Logger {
 }
 
 type logger struct {
-	inner *slog.Logger
+	inner   *slog.Logger
+	runtime *Runtime
 }
 
 func (l *logger) Debug(message string, attrs ...any) {
@@ -229,7 +233,18 @@ func (l *logger) Error(message string, attrs ...any) {
 }
 
 func (l *logger) With(attrs ...any) Logger {
-	return &logger{inner: l.inner.With(attrs...)}
+	return &logger{
+		inner:   l.inner.With(attrs...),
+		runtime: l.runtime,
+	}
+}
+
+func (l *logger) DriverTraceEnabled() bool {
+	return l.runtime != nil && l.runtime.DriverTraceEnabled()
+}
+
+func (l *logger) DriverTraceRawEnabled() bool {
+	return l.runtime != nil && l.runtime.DriverTraceRawEnabled()
 }
 
 // Secret returns an attribute value that never renders its input.

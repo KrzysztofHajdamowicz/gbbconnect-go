@@ -1,5 +1,5 @@
 // Package transportstub provides the temporary base for transports implemented
-// by the following Epic D tickets.
+// by the remaining Epic D tickets.
 package transportstub
 
 import (
@@ -10,8 +10,7 @@ import (
 	"github.com/KrzysztofHajdamowicz/gbbconnect-go/internal/logbuf"
 )
 
-// Transport holds construction data until its medium-specific implementation
-// replaces the stub in GC-031 through GC-034.
+// Transport identifies a pending medium-specific implementation.
 type Transport struct {
 	kind config.DriverType
 }

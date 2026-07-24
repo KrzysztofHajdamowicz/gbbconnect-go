@@ -89,6 +89,33 @@ func TestCloudLevelMapping(t *testing.T) {
 	}
 }
 
+func TestWithPreservesDriverTraceControls(t *testing.T) {
+	t.Parallel()
+
+	runtime, err := New(Options{Level: LevelInfo, Output: io.Discard})
+	if err != nil {
+		t.Fatal(err)
+	}
+	runtime.SetDriverTrace(true, true)
+
+	child := runtime.With("plant", 1)
+	controls, ok := child.(interface {
+		DriverTraceEnabled() bool
+		DriverTraceRawEnabled() bool
+	})
+	if !ok {
+		t.Fatalf("With() result %T does not expose trace controls", child)
+	}
+	if !controls.DriverTraceEnabled() || !controls.DriverTraceRawEnabled() {
+		t.Fatal("With() result did not preserve enabled trace controls")
+	}
+
+	runtime.SetDriverTrace(false, false)
+	if controls.DriverTraceEnabled() || controls.DriverTraceRawEnabled() {
+		t.Fatal("With() result did not observe runtime trace changes")
+	}
+}
+
 func TestJSONAndSecretRedaction(t *testing.T) {
 	t.Parallel()
 

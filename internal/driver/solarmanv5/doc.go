@@ -1,20 +1,2 @@
 // Package solarmanv5 implements the Solarman V5 transport.
 package solarmanv5
-
-import (
-	"github.com/KrzysztofHajdamowicz/gbbconnect-go/internal/config"
-	"github.com/KrzysztofHajdamowicz/gbbconnect-go/internal/driver/transportstub"
-	"github.com/KrzysztofHajdamowicz/gbbconnect-go/internal/logbuf"
-)
-
-// Transport is the Solarman V5 transport implementation.
-type Transport struct {
-	*transportstub.Transport
-}
-
-// New constructs a Solarman V5 transport.
-func New(plant config.Plant, logger logbuf.Logger) *Transport {
-	return &Transport{
-		Transport: transportstub.New(config.DriverSolarmanV5, plant, logger),
-	}
-}
