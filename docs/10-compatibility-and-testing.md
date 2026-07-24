@@ -144,6 +144,13 @@ Exception path: `resp[8] > 127` with `resp[9]=0x02` -> error
 
 ### Mock cloud (MQTT)
 
+The reusable harness in `internal/cloudtest` embeds Mochi MQTT, binds an
+ephemeral loopback port, and uses a generated self-signed certificate by
+default. It publishes canonical QoS 1 requests and captures response/keepalive
+publishes with their original topic, payload, retained flag, and QoS. Assertion
+helpers compare response JSON semantically and count empty QoS 1 keepalives.
+Plaintext mode is available for non-production test clients.
+
 - An embedded MQTT broker (or a real broker in CI) where the test:
   1. publishes a request to `{PlantId}/ModbusInMqtt/toDevice`,
   2. asserts a response appears on `{PlantId}/ModbusInMqtt/fromDevice` with QoS 2
