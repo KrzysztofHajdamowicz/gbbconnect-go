@@ -11,7 +11,8 @@ Authoritative source:
 
 - **Client library**: `github.com/eclipse/paho.mqtt.golang` (MQTT 3.1.1).
   This preserves the protocol used by GbbConnect2, supports QoS 1/2, and
-  provides an on-connect hook used to restore the subscription after reconnect.
+  is run with automatic reconnect disabled so the application-owned loop
+  preserves the original 5 min / 10 s retry timing.
 - **Host**: per-plant, from config `GbbOptimizer_Mqtt_Address`. Default
   `gbboptimizerX-mqtt.gbbsoft.pl` (the literal `X` is part of the default string
   in the original config default; in practice the cloud provides the real
@@ -99,10 +100,10 @@ flowchart TD
 - The original checks `MqttClient == null || !IsConnected` each loop and
   reconnects as needed; it relies on its own 60 s loop rather than the library's
   auto-reconnect.
-- `gbbconnect-go` may use the MQTT library's auto-reconnect, but MUST still:
-  - re-subscribe to `toDevice` after every (re)connect;
-  - keep publishing keepalive every 60 s;
-  - apply the 5 min / 10 s backoff after a full failure cycle.
+- `gbbconnect-go` uses an application-owned reconnect loop, matching the
+  original. It re-subscribes to `toDevice` after every successful explicit
+  connect, keeps publishing keepalive every 60 s, and applies the 5 min / 10 s
+  backoff after a failed connection cycle.
 
 ## 6. Message receive handling (summary)
 
@@ -114,11 +115,11 @@ the response Header, optionally attaches incremental logs, and publishes to
 
 ## 7. Compatibility checklist
 
-- [ ] Client ID `GbbConnect2_{PlantId}`.
-- [ ] Username = PlantId, Password = PlantToken.
-- [ ] TLS on by default with verification.
-- [ ] Subscribe `{PlantId}/ModbusInMqtt/toDevice` QoS 1.
-- [ ] Publish responses `{PlantId}/ModbusInMqtt/fromDevice` QoS 2.
-- [ ] Publish keepalive `{PlantId}/keepalive` QoS 1, empty payload, every 60 s.
-- [ ] 5 min (prod) / 10 s (dev) outer backoff.
-- [ ] Never log `PlantToken`.
+- [x] Client ID `GbbConnect2_{PlantId}`.
+- [x] Username = PlantId, Password = PlantToken.
+- [x] TLS on by default with verification.
+- [x] Subscribe `{PlantId}/ModbusInMqtt/toDevice` QoS 1.
+- [x] Publish responses `{PlantId}/ModbusInMqtt/fromDevice` QoS 2.
+- [x] Publish keepalive `{PlantId}/keepalive` QoS 1, empty payload, every 60 s.
+- [x] 5 min (prod) / 10 s (dev) outer backoff.
+- [x] Never log `PlantToken`.

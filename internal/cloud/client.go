@@ -8,7 +8,6 @@ import (
 	"net"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	mqtt "github.com/eclipse/paho.mqtt.golang"
@@ -44,8 +43,6 @@ type Client struct {
 
 	handlerMu sync.RWMutex
 	handler   MessageHandler
-
-	connectionCount atomic.Uint64
 }
 
 // NewClient creates a disconnected MQTT client for one plant.
@@ -101,12 +98,9 @@ func newClient(cloud config.Cloud, logger logbuf.Logger, factory backendFactory)
 		SetPassword(cloud.PlantToken).
 		SetTLSConfig(tlsConfig).
 		SetProtocolVersion(4).
-		SetAutoReconnect(true).
+		SetAutoReconnect(false).
 		SetConnectRetry(false)
 
-	options.SetOnConnectHandler(func(_ mqtt.Client) {
-		client.handleConnected()
-	})
 	options.SetConnectionLostHandler(func(_ mqtt.Client, err error) {
 		client.logger.Warn("MQTT connection lost", "error", err)
 	})
@@ -133,10 +127,8 @@ func (c *Client) Connect(ctx context.Context) error {
 		return fmt.Errorf("connect to MQTT broker: %w", err)
 	}
 
-	// Paho runs OnConnect after completing the connect token. The first
-	// callback deliberately skips subscription; doing it here makes initial
-	// Connect deterministic and lets subscription errors reach the caller.
 	if err := c.subscribeCurrent(ctx); err != nil {
+		c.backend.Disconnect(disconnectQuiesceMillis)
 		return err
 	}
 	c.logger.Info("connected to MQTT broker")
@@ -206,22 +198,6 @@ func (c *Client) IsConnected() bool {
 // Disconnect ends the MQTT session after allowing queued work to quiesce.
 func (c *Client) Disconnect() {
 	c.backend.Disconnect(disconnectQuiesceMillis)
-	c.connectionCount.Store(0)
-}
-
-func (c *Client) handleConnected() {
-	connection := c.connectionCount.Add(1)
-	if connection == 1 {
-		return
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), defaultPublishTimeout)
-	defer cancel()
-	if err := c.subscribeCurrent(ctx); err != nil {
-		c.logger.Error("failed to restore MQTT subscription", "error", err)
-		return
-	}
-	c.logger.Info("restored MQTT subscription")
 }
 
 func (c *Client) subscribeCurrent(ctx context.Context) error {

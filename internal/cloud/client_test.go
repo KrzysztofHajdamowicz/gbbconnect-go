@@ -80,8 +80,8 @@ func TestNewClientBuildsCompatibleOptions(t *testing.T) {
 	if got := reader.ProtocolVersion(); got != 4 {
 		t.Errorf("ProtocolVersion = %d, want 4", got)
 	}
-	if !reader.AutoReconnect() {
-		t.Error("AutoReconnect = false, want true")
+	if reader.AutoReconnect() {
+		t.Error("AutoReconnect = true, want explicit reconnect loop")
 	}
 	if reader.ConnectRetry() {
 		t.Error("ConnectRetry = true, want false")
@@ -197,7 +197,10 @@ func TestConnectSubscribesAndReconnectRestoresSubscription(t *testing.T) {
 	subscriptions := backend.subscriptionsSnapshot()
 	assertSubscription(t, subscriptions, 1)
 
-	backend.options.OnConnect(nil)
+	backend.dropConnection()
+	if err := client.Connect(context.Background()); err != nil {
+		t.Fatalf("Connect() after drop error = %v", err)
+	}
 	subscriptions = backend.subscriptionsSnapshot()
 	assertSubscription(t, subscriptions, 2)
 
@@ -390,6 +393,9 @@ func TestConnectAndInitialSubscriptionErrors(t *testing.T) {
 	if err := subscribeClient.Connect(context.Background()); !errors.Is(err, subscribeBackend.subscribeErr) {
 		t.Fatalf("Connect() subscription error = %v, want subscribe error", err)
 	}
+	if subscribeClient.IsConnected() {
+		t.Error("IsConnected() = true after initial subscription failure")
+	}
 }
 
 func testCloud() config.Cloud {
@@ -458,15 +464,14 @@ type fakeBackend struct {
 
 	options *mqtt.ClientOptions
 
-	connected          bool
-	returnNil          bool
-	connectToken       *fakeToken
-	subscribeErr       error
-	publishErr         error
-	subscriptions      []subscription
-	publications       []publication
-	disconnectQuiesce  uint
-	onConnectCallCount int
+	connected         bool
+	returnNil         bool
+	connectToken      *fakeToken
+	subscribeErr      error
+	publishErr        error
+	subscriptions     []subscription
+	publications      []publication
+	disconnectQuiesce uint
 }
 
 func newFakeBackend() *fakeBackend {
@@ -489,17 +494,9 @@ func (backend *fakeBackend) IsConnected() bool {
 
 func (backend *fakeBackend) Connect() mqttToken {
 	backend.mu.Lock()
+	defer backend.mu.Unlock()
 	backend.connected = backend.connectToken.err == nil
-	backend.onConnectCallCount++
-	connected := backend.connected
-	onConnect := backend.options.OnConnect
-	token := backend.connectToken
-	backend.mu.Unlock()
-
-	if connected && onConnect != nil {
-		onConnect(nil)
-	}
-	return token
+	return backend.connectToken
 }
 
 func (backend *fakeBackend) Subscribe(
@@ -551,6 +548,12 @@ func (backend *fakeBackend) publicationsSnapshot() []publication {
 	backend.mu.Lock()
 	defer backend.mu.Unlock()
 	return append([]publication(nil), backend.publications...)
+}
+
+func (backend *fakeBackend) dropConnection() {
+	backend.mu.Lock()
+	defer backend.mu.Unlock()
+	backend.connected = false
 }
 
 func (backend *fakeBackend) deliver(topic string, payload []byte) {
