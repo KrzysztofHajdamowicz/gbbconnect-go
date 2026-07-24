@@ -150,6 +150,7 @@ Exception path: `resp[8] > 127` with `resp[9]=0x02` -> error
 - [ ] Sub-inverter routing resolves dongle serial/address/port and errors with
       the exact not-found message when missing.
 - [x] LogLevel remote control updates verbosity and persists.
+- [x] Incremental LastLog streaming persists its cursor and handles day rollover.
 - [ ] New transports (RTU-over-TCP, serial) round-trip a read and a write
       against their mocks, with CRC validation.
 - [ ] Discovery returns serials from a mock dongle responder on UDP 48899.

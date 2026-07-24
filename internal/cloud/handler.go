@@ -30,6 +30,7 @@ type HandlerOptions struct {
 	Environment        string
 	DriverFactory      DriverFactory
 	LogLevelController LogLevelController
+	LastLogStreamer    LastLogStreamer
 }
 
 // RequestHandler serializes and processes cloud requests for one plant.
@@ -41,6 +42,7 @@ type RequestHandler struct {
 	environment string
 	newDriver   DriverFactory
 	logLevel    LogLevelController
+	lastLog     LastLogStreamer
 	token       chan struct{}
 }
 
@@ -59,6 +61,9 @@ func NewRequestHandler(
 	}
 	if options.LogLevelController == nil {
 		return nil, errors.New("request handler log level controller is required")
+	}
+	if options.LastLogStreamer == nil {
+		return nil, errors.New("request handler last log streamer is required")
 	}
 	if logger == nil {
 		logger = noopLogger{}
@@ -88,6 +93,7 @@ func NewRequestHandler(
 		environment: environment,
 		newDriver:   factory,
 		logLevel:    options.LogLevelController,
+		lastLog:     options.LastLogStreamer,
 		token:       make(chan struct{}, 1),
 	}
 	handler.token <- struct{}{}
@@ -127,6 +133,7 @@ func (handler *RequestHandler) Handle(ctx context.Context, payload []byte) error
 		return err
 	}
 	handler.execute(ctx, header)
+	lastLog, commitLastLog := handler.prepareLastLog(header)
 
 	response, err := protocol.Encode(header)
 	if err != nil {
@@ -139,6 +146,11 @@ func (handler *RequestHandler) Handle(ctx context.Context, payload []byte) error
 		responseQoS,
 	); err != nil {
 		return fmt.Errorf("publish cloud response: %w", err)
+	}
+	if commitLastLog {
+		if err := handler.lastLog.Commit(handler.plant.Number, lastLog.State); err != nil {
+			return fmt.Errorf("persist last log cursor: %w", err)
+		}
 	}
 	return nil
 }
@@ -160,6 +172,22 @@ func (handler *RequestHandler) applyLogLevel(header *protocol.Header) error {
 		return fmt.Errorf("apply cloud log level: %w", err)
 	}
 	return nil
+}
+
+func (handler *RequestHandler) prepareLastLog(
+	header *protocol.Header,
+) (LastLogRead, bool) {
+	if header.SendLastLog == nil || *header.SendLastLog == 0 {
+		return LastLogRead{}, false
+	}
+
+	lastLog, err := handler.lastLog.Prepare(handler.plant.Number)
+	if err != nil {
+		handler.logger.Error("get last log failed", "error", err)
+		return LastLogRead{}, false
+	}
+	header.LastLog = lastLog.Text
+	return lastLog, true
 }
 
 func (handler *RequestHandler) execute(ctx context.Context, header *protocol.Header) {

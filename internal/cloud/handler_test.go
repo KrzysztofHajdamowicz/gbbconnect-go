@@ -298,6 +298,106 @@ func TestRequestHandlerReturnsPublishFailure(t *testing.T) {
 	}
 }
 
+func TestRequestHandlerAttachesLastLogAndCommitsAfterPublish(t *testing.T) {
+	t.Parallel()
+
+	const day = "2026-07-24"
+	logDirectory := t.TempDir()
+	writeLogFile(t, logDirectory, day, "existing\n")
+	store := newTestStateStore(t)
+	streamer := newTestLogStreamer(t, store, logDirectory, day)
+	publisher := &fakeResponsePublisher{}
+	handler, err := NewRequestHandler(
+		testHandlerPlant(),
+		publisher,
+		nil,
+		HandlerOptions{
+			Version:            "1.3.0-go",
+			Environment:        "Test",
+			LogLevelController: noopLogLevelController{},
+			LastLogStreamer:    streamer,
+			DriverFactory: func(config.Plant, logbuf.Logger) (driver.Driver, error) {
+				return &fakeHandlerDriver{}, nil
+			},
+		},
+	)
+	if err != nil {
+		t.Fatalf("NewRequestHandler() error = %v", err)
+	}
+
+	request := []byte(`{"SendLastLog":1}`)
+	if err := handler.Handle(context.Background(), request); err != nil {
+		t.Fatalf("first Handle() error = %v", err)
+	}
+	first := decodePublishedHeader(t, publisher.messages[0].payload)
+	if first.LastLog != nil {
+		t.Fatalf("first LastLog = %q, want nil", dereference(first.LastLog))
+	}
+
+	appendLogFile(t, logDirectory, day, "incremental\n")
+	if err := handler.Handle(context.Background(), request); err != nil {
+		t.Fatalf("second Handle() error = %v", err)
+	}
+	second := decodePublishedHeader(t, publisher.messages[1].payload)
+	if got := dereference(second.LastLog); got != "incremental\n" {
+		t.Fatalf("second LastLog = %q", got)
+	}
+
+	persisted, err := store.Load(testHandlerPlant().Number)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if persisted.LastLogDate != day ||
+		persisted.LastLogPos != int64(len("existing\nincremental\n")) {
+		t.Fatalf("persisted cursor = %#v", persisted)
+	}
+}
+
+func TestRequestHandlerDoesNotCommitLastLogWhenPublishFails(t *testing.T) {
+	t.Parallel()
+
+	wantErr := errors.New("publish failed")
+	streamer := &recordingLastLogStreamer{
+		prepared: LastLogRead{
+			Text: stringPointer("new log\n"),
+			State: state.PlantState{
+				LastLogDate: "2026-07-24",
+				LastLogPos:  8,
+			},
+		},
+	}
+	handler, err := NewRequestHandler(
+		testHandlerPlant(),
+		&fakeResponsePublisher{err: wantErr},
+		nil,
+		HandlerOptions{
+			Version:            "1.3.0-go",
+			Environment:        "Test",
+			LogLevelController: noopLogLevelController{},
+			LastLogStreamer:    streamer,
+			DriverFactory: func(config.Plant, logbuf.Logger) (driver.Driver, error) {
+				return &fakeHandlerDriver{}, nil
+			},
+		},
+	)
+	if err != nil {
+		t.Fatalf("NewRequestHandler() error = %v", err)
+	}
+
+	if err := handler.Handle(
+		context.Background(),
+		[]byte(`{"SendLastLog":1}`),
+	); !errors.Is(err, wantErr) {
+		t.Fatalf("Handle() error = %v, want publish error", err)
+	}
+	if streamer.prepareCalls != 1 {
+		t.Fatalf("Prepare() calls = %d, want 1", streamer.prepareCalls)
+	}
+	if streamer.commitCalls != 0 {
+		t.Fatalf("Commit() calls = %d, want 0", streamer.commitCalls)
+	}
+}
+
 func TestRequestHandlerAppliesRemoteLogLevelBeforeDriverWork(t *testing.T) {
 	t.Parallel()
 
@@ -326,6 +426,7 @@ func TestRequestHandlerAppliesRemoteLogLevelBeforeDriverWork(t *testing.T) {
 			Version:            "1.3.0-go",
 			Environment:        "Test",
 			LogLevelController: controller,
+			LastLogStreamer:    noopLastLogStreamer{},
 			DriverFactory: func(config.Plant, logbuf.Logger) (driver.Driver, error) {
 				driverObservedLevel = logRuntime.Level() == logbuf.LevelInfo &&
 					logRuntime.DriverTraceEnabled() &&
@@ -383,6 +484,7 @@ func TestRequestHandlerWarnsAndIgnoresUnknownRemoteLogLevel(t *testing.T) {
 			Version:            "1.3.0-go",
 			Environment:        "Test",
 			LogLevelController: controller,
+			LastLogStreamer:    noopLastLogStreamer{},
 			DriverFactory: func(config.Plant, logbuf.Logger) (driver.Driver, error) {
 				return &fakeHandlerDriver{}, nil
 			},
@@ -511,9 +613,18 @@ func TestNewRequestHandlerValidationAndDefaults(t *testing.T) {
 	); err == nil {
 		t.Fatal("NewRequestHandler() nil log level controller error = nil")
 	}
+	if _, err := NewRequestHandler(
+		plant,
+		publisher,
+		nil,
+		HandlerOptions{LogLevelController: noopLogLevelController{}},
+	); err == nil {
+		t.Fatal("NewRequestHandler() nil last log streamer error = nil")
+	}
 
 	handler, err := NewRequestHandler(plant, publisher, nil, HandlerOptions{
 		LogLevelController: noopLogLevelController{},
+		LastLogStreamer:    noopLastLogStreamer{},
 		DriverFactory: func(config.Plant, logbuf.Logger) (driver.Driver, error) {
 			return &fakeHandlerDriver{}, nil
 		},
@@ -558,6 +669,7 @@ func mustRequestHandler(
 			Environment:        "Test",
 			DriverFactory:      factory,
 			LogLevelController: noopLogLevelController{},
+			LastLogStreamer:    noopLastLogStreamer{},
 		},
 	)
 	if err != nil {
@@ -568,6 +680,7 @@ func mustRequestHandler(
 
 func testHandlerPlant() config.Plant {
 	return config.Plant{
+		Number:  1,
 		Name:    "test plant",
 		Enabled: true,
 		Driver:  config.DriverSolarmanV5,
@@ -620,6 +733,34 @@ type noopLogLevelController struct{}
 
 func (noopLogLevelController) ApplyCloudLevel(string) error {
 	return nil
+}
+
+type noopLastLogStreamer struct{}
+
+func (noopLastLogStreamer) Prepare(int) (LastLogRead, error) {
+	return LastLogRead{}, nil
+}
+
+func (noopLastLogStreamer) Commit(int, state.PlantState) error {
+	return nil
+}
+
+type recordingLastLogStreamer struct {
+	prepared LastLogRead
+	err      error
+
+	prepareCalls int
+	commitCalls  int
+}
+
+func (streamer *recordingLastLogStreamer) Prepare(int) (LastLogRead, error) {
+	streamer.prepareCalls++
+	return streamer.prepared, streamer.err
+}
+
+func (streamer *recordingLastLogStreamer) Commit(int, state.PlantState) error {
+	streamer.commitCalls++
+	return streamer.err
 }
 
 type responseMessage struct {

@@ -168,18 +168,19 @@ block) keeps per-plant `LastLog_Date` and `LastLog_Pos`:
   yesterday then resets to today at position 0; if the date is older/unset, it
   jumps to the end of today's file.
 
-`gbbconnect-go` should implement an equivalent using the file-based log buffer
-(see [01-architecture.md](01-architecture.md) §7 and the `logbuf` package). It is
-acceptable to ship an initial version that returns `null` LastLog (the cloud
-copes) and implement full streaming in a later ticket, but the state fields must
-exist from the start (see [07-configuration.md](07-configuration.md) state
-section).
+`gbbconnect-go` implements the equivalent using the daily files produced by the
+`logbuf` package (see [01-architecture.md](01-architecture.md) §7). The first
+request starts at the end of today's file, subsequent requests return exactly
+the newly appended bytes, and the cursor is committed only after a successful
+response publish. Cursor state is described in
+[07-configuration.md](07-configuration.md) §7.
 
 ## 9. Compatibility checklist
 
 - [x] PascalCase JSON field names; null fields omitted on encode.
 - [x] Lenient decode (trailing commas, case-insensitive LogLevel/hex).
 - [x] Remote LogLevel control updates live logging and persists across restart.
+- [x] `SendLastLog` streams new daily-log bytes with a durable per-plant cursor.
 - [x] Per-line execution overwrites `Modbus` with the response hex.
 - [x] Error cascading: first failure nulls this + remaining lines and breaks.
 - [x] Global failure nulls all lines and sets `Header.Error`.

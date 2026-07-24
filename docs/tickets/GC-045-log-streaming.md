@@ -3,7 +3,7 @@
 - **Epic:** E - Cloud gateway
 - **Type:** Feature
 - **Priority:** Low
-- **Status:** TODO
+- **Status:** DONE
 - **Estimate:** 1 day
 - **Depends on:** GC-043, GC-013, GC-002
 - **Blocks:** -
