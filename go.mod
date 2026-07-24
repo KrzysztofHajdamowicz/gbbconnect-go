@@ -9,7 +9,7 @@ require (
 	github.com/spf13/cobra v1.10.2
 	go.bug.st/serial v1.8.0
 	go.yaml.in/yaml/v3 v3.0.4
-	golang.org/x/sys v0.43.0
+	golang.org/x/sys v0.47.0
 )
 
 require (
