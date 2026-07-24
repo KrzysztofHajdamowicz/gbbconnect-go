@@ -4,9 +4,14 @@
 > Wire-compatible with the GbbOptimizer cloud (MQTT over TLS), with a cleanly
 > engineered "core" and additional inverter transports.
 
-This repository contains the design documentation, implementation backlog, and
-the initial Go application scaffold. Functionality is being implemented
-incrementally from the tickets in [`docs/tickets/`](docs/tickets/).
+This repository contains the working application, deployment packages, design
+documentation, and implementation history. Development is tracked
+incrementally in [`docs/tickets/`](docs/tickets/).
+
+To install and configure a plant, start with the
+**[end-user guide](docs/user-guide.md)**. It includes Docker, Home Assistant,
+systemd, every supported transport, discovery, GbbConnect2 migration, secret
+handling, and troubleshooting.
 
 ---
 
@@ -73,10 +78,9 @@ existing plants keep working.
 - **Language: Go.** Static binaries, simple `GOOS`/`GOARCH` cross-compilation,
   good standard library for TCP/TLS/UDP, and mature ecosystem libraries for the
   parts we need (MQTT, Modbus, serial).
-- Suggested libraries (final choice is per-ticket): `eclipse/paho.mqtt.golang`
-  for MQTT, `go.bug.st/serial` for serial ports. Modbus framing is implemented
-  in-house (it is small and must match the original byte-for-byte), so a
-  third-party Modbus library is optional.
+- **Libraries:** `eclipse/paho.mqtt.golang` for MQTT and `go.bug.st/serial` for
+  serial ports. Modbus framing is implemented in-house because it is small and
+  must match the original byte-for-byte.
 - Working name: module `gbbconnect-go`, binary `gbbconnect`. Easy to rename.
 
 ## 4. Documentation map
@@ -85,6 +89,7 @@ Read in this order:
 
 | Doc | Purpose |
 |-----|---------|
+| [docs/user-guide.md](docs/user-guide.md) | Installation, configuration, migration, discovery, and troubleshooting. |
 | [docs/01-architecture.md](docs/01-architecture.md) | Target Go architecture, concurrency, lifecycle. |
 | [docs/02-protocol-cloud-mqtt.md](docs/02-protocol-cloud-mqtt.md) | MQTT/TLS transport: broker, auth, topics, QoS, keepalive. |
 | [docs/03-protocol-json-app.md](docs/03-protocol-json-app.md) | JSON Header/Line application protocol. |
@@ -97,7 +102,7 @@ Read in this order:
 | [docs/10-compatibility-and-testing.md](docs/10-compatibility-and-testing.md) | Golden vectors, mocks, acceptance matrix. |
 | [docs/11-glossary.md](docs/11-glossary.md) | Domain terminology. |
 
-## 5. Implementation backlog
+## 5. Implementation history
 
 The work is broken into epics and tickets under
 [docs/tickets/](docs/tickets/). Start at
