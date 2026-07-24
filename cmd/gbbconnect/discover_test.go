@@ -18,6 +18,7 @@ func TestDiscoverCommandMergesBroadcastAndSubnetResults(t *testing.T) {
 	var gotInterface string
 	var gotTimeout time.Duration
 	var gotSubnet string
+	var gotUDPSubnet string
 	var gotPort int
 	var gotConcurrency int
 	dependencies := discoveryDependencies{
@@ -37,6 +38,20 @@ func TestDiscoverCommandMergesBroadcastAndSubnetResults(t *testing.T) {
 				},
 				{IP: "192.168.1.105", Serial: 4012345678, Raw: "udp-two"},
 			}, nil
+		},
+		discoverUDPSubnet: func(
+			_ context.Context,
+			_ string,
+			cidr string,
+			_ time.Duration,
+		) ([]discovery.Dongle, error) {
+			gotUDPSubnet = cidr
+			return []discovery.Dongle{{
+				IP:     "192.168.1.110",
+				MAC:    "AA:BB:CC:DD:EE:FF",
+				Serial: 2112345678,
+				Raw:    "udp-unicast",
+			}}, nil
 		},
 		scanSubnet: func(
 			_ context.Context,
@@ -72,7 +87,8 @@ func TestDiscoverCommandMergesBroadcastAndSubnetResults(t *testing.T) {
 	if gotInterface != "192.168.1.2" || gotTimeout != 250*time.Millisecond {
 		t.Fatalf("UDP arguments = interface %q, timeout %s", gotInterface, gotTimeout)
 	}
-	if gotSubnet != "192.168.1.0/24" ||
+	if gotUDPSubnet != "192.168.1.0/24" ||
+		gotSubnet != "192.168.1.0/24" ||
 		gotPort != 18899 ||
 		gotConcurrency != defaultDiscoveryConcurrency {
 		t.Fatalf(
@@ -90,6 +106,7 @@ func TestDiscoverCommandMergesBroadcastAndSubnetResults(t *testing.T) {
 		"1720000000",
 		"192.168.1.105",
 		"192.168.1.110",
+		"2112345678",
 		"3 dongle(s) found.",
 	} {
 		if !strings.Contains(text, fragment) {
@@ -112,6 +129,14 @@ func TestDiscoverCommandJSONAndBroadcastDisable(t *testing.T) {
 			time.Duration,
 		) ([]discovery.Dongle, error) {
 			udpCalls++
+			return nil, nil
+		},
+		discoverUDPSubnet: func(
+			context.Context,
+			string,
+			string,
+			time.Duration,
+		) ([]discovery.Dongle, error) {
 			return nil, nil
 		},
 		scanSubnet: func(

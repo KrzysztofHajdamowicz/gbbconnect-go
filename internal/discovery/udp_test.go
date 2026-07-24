@@ -52,8 +52,8 @@ func TestDiscoverUDPCollectsResponsesAndIgnoresEcho(t *testing.T) {
 		"127.0.0.1",
 		100*time.Millisecond,
 		udpDiscoveryOptions{
-			bindPort:    0,
-			destination: responder.LocalAddr().(*net.UDPAddr),
+			bindPort:     0,
+			destinations: []*net.UDPAddr{responder.LocalAddr().(*net.UDPAddr)},
 		},
 	)
 	if err != nil {
@@ -66,14 +66,18 @@ func TestDiscoverUDPCollectsResponsesAndIgnoresEcho(t *testing.T) {
 		t.Fatalf("dongle count = %d, want 2: %#v", len(dongles), dongles)
 	}
 	if dongles[0] != (Dongle{
-		IP:     "192.168.1.100",
-		MAC:    "AC:1F:0B:AA:BB:CC",
-		Serial: 1720000000,
-		Raw:    "192.168.1.100,AC:1F:0B:AA:BB:CC,1720000000",
+		IP:       "192.168.1.100",
+		MAC:      "AC:1F:0B:AA:BB:CC",
+		Serial:   1720000000,
+		Protocol: "solarman_v5",
+		Raw:      "192.168.1.100,AC:1F:0B:AA:BB:CC,1720000000",
 	}) {
 		t.Fatalf("parsed dongle = %#v", dongles[0])
 	}
-	if dongles[1] != (Dongle{Raw: "firmware-specific response"}) {
+	if dongles[1] != (Dongle{
+		Protocol: "solarman_v5",
+		Raw:      "firmware-specific response",
+	}) {
 		t.Fatalf("unparseable dongle = %#v", dongles[1])
 	}
 }
@@ -105,8 +109,8 @@ func TestDiscoverUDPReturnsPromptlyOnCancellation(t *testing.T) {
 		"",
 		5*time.Second,
 		udpDiscoveryOptions{
-			bindPort:    0,
-			destination: responder.LocalAddr().(*net.UDPAddr),
+			bindPort:     0,
+			destinations: []*net.UDPAddr{responder.LocalAddr().(*net.UDPAddr)},
 		},
 	)
 	if !errors.Is(err, context.Canceled) {
@@ -132,24 +136,26 @@ func TestParseDongleToleratesFieldOrderAndUnknownData(t *testing.T) {
 			name: "reordered and padded",
 			raw:  " 4012345678 , 192.168.1.105 , ac-1f-0b-01-02-03 ",
 			want: Dongle{
-				IP:     "192.168.1.105",
-				MAC:    "ac-1f-0b-01-02-03",
-				Serial: 4012345678,
-				Raw:    " 4012345678 , 192.168.1.105 , ac-1f-0b-01-02-03 ",
+				IP:       "192.168.1.105",
+				MAC:      "ac-1f-0b-01-02-03",
+				Serial:   4012345678,
+				Protocol: "solarman_v5",
+				Raw:      " 4012345678 , 192.168.1.105 , ac-1f-0b-01-02-03 ",
 			},
 		},
 		{
 			name: "short numbers are not serials",
 			raw:  "192.0.2.1,8899,other",
 			want: Dongle{
-				IP:  "192.0.2.1",
-				Raw: "192.0.2.1,8899,other",
+				IP:       "192.0.2.1",
+				Protocol: "solarman_v5",
+				Raw:      "192.0.2.1,8899,other",
 			},
 		},
 		{
 			name: "unparseable",
 			raw:  "opaque",
-			want: Dongle{Raw: "opaque"},
+			want: Dongle{Protocol: "solarman_v5", Raw: "opaque"},
 		},
 	}
 	for _, test := range tests {

@@ -2,6 +2,7 @@ package discovery
 
 import (
 	"context"
+	"encoding/binary"
 	"errors"
 	"net"
 	"net/netip"
@@ -27,6 +28,12 @@ func TestScanSubnetFindsReachableHost(t *testing.T) {
 			accepted <- acceptErr
 			return
 		}
+		frame := passiveSolarmanFrame(3147733742)
+		if _, writeErr := connection.Write(frame); writeErr != nil {
+			_ = connection.Close()
+			accepted <- writeErr
+			return
+		}
 		accepted <- connection.Close()
 	}()
 
@@ -43,8 +50,64 @@ func TestScanSubnetFindsReachableHost(t *testing.T) {
 	if err := <-accepted; err != nil {
 		t.Fatalf("mock dongle error = %v", err)
 	}
-	if len(dongles) != 1 || dongles[0] != (Dongle{IP: "127.0.0.1"}) {
+	if len(dongles) != 1 || dongles[0] != (Dongle{
+		IP:       "127.0.0.1",
+		Serial:   3147733742,
+		Protocol: "solarman_v5",
+	}) {
 		t.Fatalf("ScanSubnet() = %#v, want 127.0.0.1", dongles)
+	}
+}
+
+func TestExtractSolarmanSerialFromCoalescedFrames(t *testing.T) {
+	t.Parallel()
+
+	data := append([]byte{0, 1, 2}, passiveSolarmanFrame(3147733742)...)
+	serial, ok := extractSolarmanSerial(data)
+	if !ok || serial != 3147733742 {
+		t.Fatalf("extractSolarmanSerial() = %d, %t", serial, ok)
+	}
+	if _, ok := extractSolarmanSerial([]byte{
+		0x00, 0x01, 0x00, 0x00, 0x00, 0x0A, 0x01, 0x01,
+	}); ok {
+		t.Fatal("non-Solarman frame was identified")
+	}
+}
+
+func TestParseSolarmanStatus(t *testing.T) {
+	t.Parallel()
+
+	body := []byte(`
+		<script>
+		var cover_mid = "3147733742";
+		var cover_ver = "LSW3_32_5406_SS_04_00.00.00.0B";
+		var cover_sta_mac = "D4:27:87:98:F4:92";
+		</script>
+	`)
+	dongle, ok := parseSolarmanStatus(body)
+	if !ok {
+		t.Fatal("Solarman status page was not identified")
+	}
+	if dongle != (Dongle{
+		MAC:      "D4:27:87:98:F4:92",
+		Serial:   3147733742,
+		Protocol: "solarman_v5",
+	}) {
+		t.Fatalf("parseSolarmanStatus() = %#v", dongle)
+	}
+}
+
+func TestParseSolarmanStatusRejectsUnrelatedOrInvalidPages(t *testing.T) {
+	t.Parallel()
+
+	for _, body := range [][]byte{
+		[]byte(`<html>SolarAssistant</html>`),
+		[]byte(`var cover_mid = "0";`),
+		[]byte(`var cover_mid = "99999999999";`),
+	} {
+		if dongle, ok := parseSolarmanStatus(body); ok {
+			t.Fatalf("parseSolarmanStatus(%q) = %#v, true", body, dongle)
+		}
 	}
 }
 
@@ -223,4 +286,16 @@ func mustPrefix(t *testing.T, value string) netip.Prefix {
 		t.Fatalf("parse prefix: %v", err)
 	}
 	return prefix
+}
+
+func passiveSolarmanFrame(serial uint32) []byte {
+	frame := make([]byte, 32)
+	frame[0] = 0xA5
+	binary.LittleEndian.PutUint16(frame[1:3], uint16(len(frame)-13))
+	frame[3] = 0x10
+	frame[4] = 0x15
+	binary.LittleEndian.PutUint32(frame[7:11], serial)
+	frame[11] = 0x02
+	frame[len(frame)-1] = 0x15
+	return frame
 }

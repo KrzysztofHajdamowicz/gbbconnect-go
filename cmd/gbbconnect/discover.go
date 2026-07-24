@@ -22,6 +22,12 @@ type discoveryDependencies struct {
 		ifaceIP string,
 		timeout time.Duration,
 	) ([]discovery.Dongle, error)
+	discoverUDPSubnet func(
+		ctx context.Context,
+		ifaceIP string,
+		cidr string,
+		timeout time.Duration,
+	) ([]discovery.Dongle, error)
 	scanSubnet func(
 		ctx context.Context,
 		cidr string,
@@ -32,8 +38,9 @@ type discoveryDependencies struct {
 
 func defaultDiscoveryDependencies() discoveryDependencies {
 	return discoveryDependencies{
-		discoverUDP: discovery.DiscoverUDP,
-		scanSubnet:  discovery.ScanSubnet,
+		discoverUDP:       discovery.DiscoverUDP,
+		discoverUDPSubnet: discovery.DiscoverUDPSubnet,
+		scanSubnet:        discovery.ScanSubnet,
 	}
 }
 
@@ -49,8 +56,9 @@ func newDiscoverCommand(dependencies discoveryDependencies) *cobra.Command {
 		Use:   "discover",
 		Short: "Discover supported inverter dongles",
 		Long: "Discover supported inverter dongles using Solarman UDP broadcast " +
-			"and optional TCP subnet scanning. Subnet scanning reports reachable " +
-			"hosts but may not obtain their logger serials.",
+			"and optional routed UDP/TCP subnet scanning. Subnet scanning also " +
+			"checks the read-only Solarman status page, but may still report " +
+			"reachable candidates without logger serials.",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if !broadcast && subnet == "" {
@@ -73,10 +81,24 @@ func newDiscoverCommand(dependencies discoveryDependencies) *cobra.Command {
 				found = mergeDongles(found, dongles)
 			}
 			if subnet != "" {
+				if dependencies.discoverUDPSubnet == nil {
+					return errors.New("UDP subnet discovery is unavailable")
+				}
+				dongles, err := dependencies.discoverUDPSubnet(
+					cmd.Context(),
+					interfaceIP,
+					subnet,
+					timeout,
+				)
+				if err != nil {
+					return fmt.Errorf("UDP subnet discovery: %w", err)
+				}
+				found = mergeDongles(found, dongles)
+
 				if dependencies.scanSubnet == nil {
 					return errors.New("subnet discovery is unavailable")
 				}
-				dongles, err := dependencies.scanSubnet(
+				dongles, err = dependencies.scanSubnet(
 					cmd.Context(),
 					subnet,
 					port,
@@ -162,6 +184,9 @@ func mergeDongles(
 		if current[match].Serial == 0 {
 			current[match].Serial = candidate.Serial
 		}
+		if current[match].Protocol == "" {
+			current[match].Protocol = candidate.Protocol
+		}
 		if current[match].Raw == "" {
 			current[match].Raw = candidate.Raw
 		}
@@ -215,7 +240,7 @@ func writeDiscoveryTable(cmd *cobra.Command, dongles []discovery.Dongle) error {
 	if _, err := fmt.Fprintln(writer, "Discovered Solarman dongles:"); err != nil {
 		return err
 	}
-	if _, err := fmt.Fprintln(writer, "  IP\tMAC\tSerial\tRaw"); err != nil {
+	if _, err := fmt.Fprintln(writer, "  IP\tMAC\tSerial\tProtocol\tRaw"); err != nil {
 		return err
 	}
 	for _, dongle := range dongles {
@@ -225,10 +250,11 @@ func writeDiscoveryTable(cmd *cobra.Command, dongles []discovery.Dongle) error {
 		}
 		if _, err := fmt.Fprintf(
 			writer,
-			"  %s\t%s\t%s\t%s\n",
+			"  %s\t%s\t%s\t%s\t%s\n",
 			dongle.IP,
 			dongle.MAC,
 			serial,
+			dongle.Protocol,
 			dongle.Raw,
 		); err != nil {
 			return err

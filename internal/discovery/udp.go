@@ -17,15 +17,16 @@ const (
 
 // Dongle is one discovered inverter logger.
 type Dongle struct {
-	IP     string `json:"ip,omitempty"`
-	MAC    string `json:"mac,omitempty"`
-	Serial int64  `json:"serial,omitempty"`
-	Raw    string `json:"raw"`
+	IP       string `json:"ip,omitempty"`
+	MAC      string `json:"mac,omitempty"`
+	Serial   int64  `json:"serial,omitempty"`
+	Protocol string `json:"protocol,omitempty"`
+	Raw      string `json:"raw"`
 }
 
 type udpDiscoveryOptions struct {
-	bindPort    int
-	destination *net.UDPAddr
+	bindPort     int
+	destinations []*net.UDPAddr
 }
 
 // DiscoverUDP broadcasts a Solarman discovery request and collects responses
@@ -38,10 +39,51 @@ func DiscoverUDP(
 ) ([]Dongle, error) {
 	return discoverUDP(ctx, ifaceIP, timeout, udpDiscoveryOptions{
 		bindPort: solarmanDiscoveryPort,
-		destination: &net.UDPAddr{
+		destinations: []*net.UDPAddr{{
 			IP:   net.IPv4bcast,
 			Port: solarmanDiscoveryPort,
-		},
+		}},
+	})
+}
+
+// DiscoverUDPSubnet sends the Solarman discovery request by unicast to every
+// usable IPv4 address in a CIDR. This works across routed VLANs where broadcast
+// packets are not forwarded.
+func DiscoverUDPSubnet(
+	ctx context.Context,
+	ifaceIP string,
+	cidr string,
+	timeout time.Duration,
+) ([]Dongle, error) {
+	prefix, err := parseIPv4Prefix(cidr)
+	if err != nil {
+		return nil, err
+	}
+
+	const maximumTargets = 65536
+	destinations := make([]*net.UDPAddr, 0)
+	tooLarge := false
+	forEachUsableIPv4(prefix, func(ip string) bool {
+		if len(destinations) >= maximumTargets {
+			tooLarge = true
+			return false
+		}
+		destinations = append(destinations, &net.UDPAddr{
+			IP:   net.ParseIP(ip),
+			Port: solarmanDiscoveryPort,
+		})
+		return true
+	})
+	if tooLarge {
+		return nil, fmt.Errorf(
+			"UDP discovery subnet is too large; maximum %d targets: %q",
+			maximumTargets,
+			cidr,
+		)
+	}
+	return discoverUDP(ctx, ifaceIP, timeout, udpDiscoveryOptions{
+		bindPort:     solarmanDiscoveryPort,
+		destinations: destinations,
 	})
 }
 
@@ -64,8 +106,13 @@ func discoverUDP(
 	if err != nil {
 		return nil, err
 	}
-	if options.destination == nil {
-		return nil, errors.New("discovery destination is required")
+	if len(options.destinations) == 0 {
+		return nil, errors.New("at least one discovery destination is required")
+	}
+	for _, destination := range options.destinations {
+		if destination == nil {
+			return nil, errors.New("discovery destination is required")
+		}
 	}
 
 	// Go enables SO_BROADCAST by default when creating an IPv4 UDP socket.
@@ -96,11 +143,17 @@ func discoverUDP(
 	})
 	defer stopDeadline()
 
-	if _, err := conn.WriteToUDP(
-		[]byte(solarmanDiscoveryRequest),
-		options.destination,
-	); err != nil {
-		return nil, fmt.Errorf("send UDP discovery request: %w", err)
+	for _, destination := range options.destinations {
+		if _, err := conn.WriteToUDP(
+			[]byte(solarmanDiscoveryRequest),
+			destination,
+		); err != nil {
+			return nil, fmt.Errorf(
+				"send UDP discovery request to %s: %w",
+				destination,
+				err,
+			)
+		}
 	}
 
 	dongles := make([]Dongle, 0)
@@ -146,7 +199,7 @@ func isDiscoveryEcho(raw string) bool {
 }
 
 func parseDongle(raw string) Dongle {
-	dongle := Dongle{Raw: raw}
+	dongle := Dongle{Protocol: "solarman_v5", Raw: raw}
 	for _, field := range strings.Split(raw, ",") {
 		field = strings.TrimSpace(strings.Trim(field, "\x00"))
 		if field == "" {

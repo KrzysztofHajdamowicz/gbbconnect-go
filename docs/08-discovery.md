@@ -35,12 +35,18 @@ Authoritative source for the UDP method:
 ## 2. Subnet scan (new, optional)
 
 For networks where UDP broadcast is blocked (VLANs, some APs), support scanning a
-provided CIDR by attempting a SolarmanV5 probe to each host on the dongle port:
+provided CIDR. Discovery sends the standard request as routed UDP unicast to
+each host and also attempts a SolarmanV5 probe on the dongle TCP port:
 
 - Input: `--subnet 192.168.1.0/24` (and optional `--port 8899`).
-- For each host, attempt a TCP connect to the port with a short timeout; on
-  success, optionally send a minimal SolarmanV5 read and try to read back the
-  logger serial from the response frame (`frame[7..10]`, little-endian).
+- Send `WIFIKIT-214028-READ` by UDP unicast to every usable address. Firmware
+  which accepts routed discovery can return its normal IP/MAC/serial response.
+- For each host, attempt a TCP connect to the port with a short timeout. On
+  success, inspect any passive SolarmanV5 frame and try to read the logger
+  serial from `frame[7..10]` (little-endian).
+- If the TCP port is reachable but does not yield a frame, request the
+  read-only `/status.html` page on port 80. LSW3 firmware exposes `cover_mid`
+  (logger serial) and `cover_sta_mac` there without changing device state.
 - Concurrency-limited (e.g. 64 workers) to scan quickly without flooding.
 - Print discovered hosts and any serials obtained.
 
@@ -48,11 +54,11 @@ provided CIDR by attempting a SolarmanV5 probe to each host on the dongle port:
 > minimum it reports reachable dongle ports. Document this limitation in the CLI
 > help.
 
-The current scanner uses the minimum reliable probe: a bounded, cancellable TCP
-connect with a 500 ms per-host timeout. It reports every reachable host, with
-`serial` left unset. A SolarmanV5 request itself requires the logger serial, so
-active serial extraction cannot be assumed when scanning an unknown device;
-use UDP discovery when the serial is required.
+The scanner remains bounded and cancellable. It reports every host with a
+reachable dongle port even if neither the routed UDP request, a passive frame,
+nor the status page exposes a serial. Consequently, a row without serial and
+protocol is only a candidate and can be a false positive when unrelated
+software listens on the configured port.
 
 ## 3. CLI design
 
