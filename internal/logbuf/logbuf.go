@@ -19,6 +19,10 @@ import (
 
 const redactedText = "[REDACTED]"
 
+// ErrUnknownCloudLevel identifies a LogLevel value not defined by the cloud
+// protocol.
+var ErrUnknownCloudLevel = errors.New("unknown cloud log level")
+
 // Level is an application logging severity.
 type Level int
 
@@ -162,20 +166,38 @@ func (r *Runtime) DriverTraceRawEnabled() bool {
 
 // ApplyCloudLevel applies the GbbOptimizer LogLevel mapping.
 func (r *Runtime) ApplyCloudLevel(value string) error {
-	switch {
-	case strings.EqualFold(value, "OnlyErrors"):
+	canonical, err := CanonicalCloudLevel(value)
+	if err != nil {
+		return err
+	}
+
+	switch canonical {
+	case "OnlyErrors":
 		r.level.Set(slog.LevelError)
 		r.SetDriverTrace(false, false)
-	case strings.EqualFold(value, "Min"):
+	case "Min":
 		r.level.Set(slog.LevelInfo)
 		r.SetDriverTrace(false, false)
-	case strings.EqualFold(value, "Max"):
+	case "Max":
 		r.level.Set(slog.LevelInfo)
 		r.SetDriverTrace(true, true)
-	default:
-		return fmt.Errorf("unknown cloud log level %q", value)
 	}
 	return nil
+}
+
+// CanonicalCloudLevel validates a cloud LogLevel case-insensitively and returns
+// its protocol spelling.
+func CanonicalCloudLevel(value string) (string, error) {
+	switch {
+	case strings.EqualFold(value, "OnlyErrors"):
+		return "OnlyErrors", nil
+	case strings.EqualFold(value, "Min"):
+		return "Min", nil
+	case strings.EqualFold(value, "Max"):
+		return "Max", nil
+	default:
+		return "", fmt.Errorf("%w %q", ErrUnknownCloudLevel, value)
+	}
 }
 
 // Close flushes and closes the optional daily file sink.

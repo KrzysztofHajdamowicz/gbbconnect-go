@@ -12,6 +12,7 @@ import (
 	"github.com/KrzysztofHajdamowicz/gbbconnect-go/internal/driver"
 	"github.com/KrzysztofHajdamowicz/gbbconnect-go/internal/logbuf"
 	"github.com/KrzysztofHajdamowicz/gbbconnect-go/internal/protocol"
+	"github.com/KrzysztofHajdamowicz/gbbconnect-go/internal/state"
 )
 
 func TestRequestHandlerHappyPath(t *testing.T) {
@@ -297,6 +298,127 @@ func TestRequestHandlerReturnsPublishFailure(t *testing.T) {
 	}
 }
 
+func TestRequestHandlerAppliesRemoteLogLevelBeforeDriverWork(t *testing.T) {
+	t.Parallel()
+
+	logRuntime, err := logbuf.New(logbuf.Options{
+		Level:  logbuf.LevelError,
+		Output: &bytes.Buffer{},
+	})
+	if err != nil {
+		t.Fatalf("logbuf.New() error = %v", err)
+	}
+	store, err := state.New(t.TempDir())
+	if err != nil {
+		t.Fatalf("state.New() error = %v", err)
+	}
+	controller, err := NewPersistentLogLevelController(logRuntime, store)
+	if err != nil {
+		t.Fatalf("NewPersistentLogLevelController() error = %v", err)
+	}
+
+	driverObservedLevel := false
+	handler, err := NewRequestHandler(
+		testHandlerPlant(),
+		&fakeResponsePublisher{},
+		logRuntime,
+		HandlerOptions{
+			Version:            "1.3.0-go",
+			Environment:        "Test",
+			LogLevelController: controller,
+			DriverFactory: func(config.Plant, logbuf.Logger) (driver.Driver, error) {
+				driverObservedLevel = logRuntime.Level() == logbuf.LevelInfo &&
+					logRuntime.DriverTraceEnabled() &&
+					logRuntime.DriverTraceRawEnabled()
+				return &fakeHandlerDriver{}, nil
+			},
+		},
+	)
+	if err != nil {
+		t.Fatalf("NewRequestHandler() error = %v", err)
+	}
+
+	if err := handler.Handle(context.Background(), []byte(`{"LogLevel":"mAx"}`)); err != nil {
+		t.Fatalf("Handle() error = %v", err)
+	}
+	if !driverObservedLevel {
+		t.Fatal("driver factory did not observe Max logging controls")
+	}
+
+	persisted, err := store.LoadRuntime()
+	if err != nil {
+		t.Fatalf("LoadRuntime() error = %v", err)
+	}
+	if persisted.LogLevel != "Max" {
+		t.Fatalf("persisted LogLevel = %q, want Max", persisted.LogLevel)
+	}
+}
+
+func TestRequestHandlerWarnsAndIgnoresUnknownRemoteLogLevel(t *testing.T) {
+	t.Parallel()
+
+	var output bytes.Buffer
+	logRuntime, err := logbuf.New(logbuf.Options{
+		Level:  logbuf.LevelDebug,
+		Output: &output,
+	})
+	if err != nil {
+		t.Fatalf("logbuf.New() error = %v", err)
+	}
+	logRuntime.SetDriverTrace(true, false)
+	store, err := state.New(t.TempDir())
+	if err != nil {
+		t.Fatalf("state.New() error = %v", err)
+	}
+	controller, err := NewPersistentLogLevelController(logRuntime, store)
+	if err != nil {
+		t.Fatalf("NewPersistentLogLevelController() error = %v", err)
+	}
+	publisher := &fakeResponsePublisher{}
+	handler, err := NewRequestHandler(
+		testHandlerPlant(),
+		publisher,
+		logRuntime,
+		HandlerOptions{
+			Version:            "1.3.0-go",
+			Environment:        "Test",
+			LogLevelController: controller,
+			DriverFactory: func(config.Plant, logbuf.Logger) (driver.Driver, error) {
+				return &fakeHandlerDriver{}, nil
+			},
+		},
+	)
+	if err != nil {
+		t.Fatalf("NewRequestHandler() error = %v", err)
+	}
+
+	if err := handler.Handle(
+		context.Background(),
+		[]byte(`{"LogLevel":"everything"}`),
+	); err != nil {
+		t.Fatalf("Handle() error = %v", err)
+	}
+	if logRuntime.Level() != logbuf.LevelDebug ||
+		!logRuntime.DriverTraceEnabled() ||
+		logRuntime.DriverTraceRawEnabled() {
+		t.Fatal("unknown LogLevel changed runtime logging controls")
+	}
+	if !stringsContain(output.String(), "unknown cloud log level") ||
+		!stringsContain(output.String(), "everything") {
+		t.Fatalf("warning output = %q", output.String())
+	}
+	persisted, err := store.LoadRuntime()
+	if err != nil {
+		t.Fatalf("LoadRuntime() error = %v", err)
+	}
+	if persisted != (state.RuntimeState{}) {
+		t.Fatalf("unknown LogLevel persisted state = %#v", persisted)
+	}
+	if publisher.messageCount() != 1 {
+		t.Fatalf("unknown LogLevel published messages = %d, want 1", publisher.messageCount())
+	}
+}
+
 func TestRequestHandlerSerializesConcurrentMessagesAndQueuedCancellation(t *testing.T) {
 	t.Parallel()
 
@@ -377,12 +499,21 @@ func TestNewRequestHandlerValidationAndDefaults(t *testing.T) {
 		plant,
 		nil,
 		nil,
-		HandlerOptions{},
+		HandlerOptions{LogLevelController: noopLogLevelController{}},
 	); err == nil {
 		t.Fatal("NewRequestHandler() nil publisher error = nil")
 	}
+	if _, err := NewRequestHandler(
+		plant,
+		publisher,
+		nil,
+		HandlerOptions{},
+	); err == nil {
+		t.Fatal("NewRequestHandler() nil log level controller error = nil")
+	}
 
 	handler, err := NewRequestHandler(plant, publisher, nil, HandlerOptions{
+		LogLevelController: noopLogLevelController{},
 		DriverFactory: func(config.Plant, logbuf.Logger) (driver.Driver, error) {
 			return &fakeHandlerDriver{}, nil
 		},
@@ -423,9 +554,10 @@ func mustRequestHandler(
 		publisher,
 		nil,
 		HandlerOptions{
-			Version:       "1.3.0-go",
-			Environment:   "Test",
-			DriverFactory: factory,
+			Version:            "1.3.0-go",
+			Environment:        "Test",
+			DriverFactory:      factory,
+			LogLevelController: noopLogLevelController{},
 		},
 	)
 	if err != nil {
@@ -482,6 +614,12 @@ func dereference(value *string) string {
 
 func stringsContain(value, fragment string) bool {
 	return bytes.Contains([]byte(value), []byte(fragment))
+}
+
+type noopLogLevelController struct{}
+
+func (noopLogLevelController) ApplyCloudLevel(string) error {
+	return nil
 }
 
 type responseMessage struct {

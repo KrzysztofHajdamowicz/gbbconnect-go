@@ -15,6 +15,11 @@ type PlantState struct {
 	LastLogPos  int64  `json:"last_log_pos"`
 }
 
+// RuntimeState contains process-wide overrides changed by cloud requests.
+type RuntimeState struct {
+	LogLevel string `json:"log_level,omitempty"`
+}
+
 // DirOptions controls state-directory resolution.
 type DirOptions struct {
 	Path           string
@@ -25,8 +30,9 @@ type DirOptions struct {
 
 // Store atomically persists plant state files.
 type Store struct {
-	dir   string
-	locks sync.Map
+	dir         string
+	locks       sync.Map
+	runtimeLock sync.Mutex
 }
 
 // ResolveDir resolves the writable state directory.
@@ -101,15 +107,61 @@ func (store *Store) Save(plantNumber int, state PlantState) error {
 	lock.Lock()
 	defer lock.Unlock()
 
-	data, err := json.Marshal(state)
+	if err := store.saveJSON(
+		fmt.Sprintf("state for plant %d", plantNumber),
+		store.path(plantNumber),
+		fmt.Sprintf(".plant-%d-*.tmp", plantNumber),
+		state,
+	); err != nil {
+		return err
+	}
+	return nil
+}
+
+// LoadRuntime returns the process-wide runtime overrides. A missing file yields
+// the zero value.
+func (store *Store) LoadRuntime() (RuntimeState, error) {
+	store.runtimeLock.Lock()
+	defer store.runtimeLock.Unlock()
+
+	data, err := os.ReadFile(store.runtimePath())
+	if os.IsNotExist(err) {
+		return RuntimeState{}, nil
+	}
 	if err != nil {
-		return fmt.Errorf("encode state for plant %d: %w", plantNumber, err)
+		return RuntimeState{}, fmt.Errorf("read runtime state: %w", err)
+	}
+
+	var result RuntimeState
+	if err := json.Unmarshal(data, &result); err != nil {
+		return RuntimeState{}, fmt.Errorf("decode runtime state: %w", err)
+	}
+	return result, nil
+}
+
+// SaveRuntime atomically replaces the process-wide runtime overrides.
+func (store *Store) SaveRuntime(state RuntimeState) error {
+	store.runtimeLock.Lock()
+	defer store.runtimeLock.Unlock()
+
+	return store.saveJSON(
+		"runtime state",
+		store.runtimePath(),
+		".runtime-*.tmp",
+		state,
+	)
+}
+
+func (store *Store) saveJSON(description, path, temporaryPattern string, value any) error {
+	data, err := json.Marshal(value)
+	if err != nil {
+		return fmt.Errorf("encode %s: %w", description, err)
 	}
 	data = append(data, '\n')
 
-	temporary, err := os.CreateTemp(store.dir, fmt.Sprintf(".plant-%d-*.tmp", plantNumber))
+	temporary, err := os.CreateTemp(store.dir, temporaryPattern)
 	if err != nil {
-		return fmt.Errorf("create temporary state for plant %d: %w", plantNumber, err)
+		return fmt.Errorf("create temporary %s: %w", description, err)
 	}
 	temporaryPath := temporary.Name()
 	removeTemporary := true
@@ -121,22 +173,22 @@ func (store *Store) Save(plantNumber int, state PlantState) error {
 
 	if err := temporary.Chmod(0o600); err != nil {
 		_ = temporary.Close()
-		return fmt.Errorf("set temporary state permissions for plant %d: %w", plantNumber, err)
+		return fmt.Errorf("set temporary %s permissions: %w", description, err)
 	}
 	if _, err := temporary.Write(data); err != nil {
 		_ = temporary.Close()
-		return fmt.Errorf("write temporary state for plant %d: %w", plantNumber, err)
+		return fmt.Errorf("write temporary %s: %w", description, err)
 	}
 	if err := temporary.Sync(); err != nil {
 		_ = temporary.Close()
-		return fmt.Errorf("sync temporary state for plant %d: %w", plantNumber, err)
+		return fmt.Errorf("sync temporary %s: %w", description, err)
 	}
 	if err := temporary.Close(); err != nil {
-		return fmt.Errorf("close temporary state for plant %d: %w", plantNumber, err)
+		return fmt.Errorf("close temporary %s: %w", description, err)
 	}
 
-	if err := os.Rename(temporaryPath, store.path(plantNumber)); err != nil {
-		return fmt.Errorf("replace state for plant %d: %w", plantNumber, err)
+	if err := os.Rename(temporaryPath, path); err != nil {
+		return fmt.Errorf("replace %s: %w", description, err)
 	}
 	removeTemporary = false
 	return nil
@@ -144,6 +196,10 @@ func (store *Store) Save(plantNumber int, state PlantState) error {
 
 func (store *Store) path(plantNumber int) string {
 	return filepath.Join(store.dir, fmt.Sprintf("plant-%d.json", plantNumber))
+}
+
+func (store *Store) runtimePath() string {
+	return filepath.Join(store.dir, "runtime.json")
 }
 
 func (store *Store) lockFor(plantNumber int) *sync.Mutex {

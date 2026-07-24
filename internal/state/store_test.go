@@ -63,6 +63,54 @@ func TestLoadMissingReturnsZeroValue(t *testing.T) {
 	if got != (PlantState{}) {
 		t.Fatalf("Load() = %#v, want zero value", got)
 	}
+
+	runtimeState, err := store.LoadRuntime()
+	if err != nil {
+		t.Fatalf("LoadRuntime() error = %v", err)
+	}
+	if runtimeState != (RuntimeState{}) {
+		t.Fatalf("LoadRuntime() = %#v, want zero value", runtimeState)
+	}
+}
+
+func TestRuntimeStateRoundTrip(t *testing.T) {
+	t.Parallel()
+
+	directory := t.TempDir()
+	store, err := New(directory)
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+
+	want := RuntimeState{LogLevel: "Max"}
+	if err := store.SaveRuntime(want); err != nil {
+		t.Fatalf("SaveRuntime() error = %v", err)
+	}
+	got, err := store.LoadRuntime()
+	if err != nil {
+		t.Fatalf("LoadRuntime() error = %v", err)
+	}
+	if got != want {
+		t.Fatalf("LoadRuntime() = %#v, want %#v", got, want)
+	}
+
+	path := filepath.Join(directory, "runtime.json")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read runtime state file: %v", err)
+	}
+	const expectedJSON = `{"log_level":"Max"}` + "\n"
+	if string(data) != expectedJSON {
+		t.Fatalf("runtime state JSON = %q, want %q", data, expectedJSON)
+	}
+
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatalf("stat runtime state file: %v", err)
+	}
+	if info.Mode().Perm() != 0o600 {
+		t.Fatalf("runtime state permissions = %o, want 600", info.Mode().Perm())
+	}
 }
 
 func TestConcurrentDistinctPlants(t *testing.T) {
@@ -236,6 +284,13 @@ func TestInvalidStateAndDirectory(t *testing.T) {
 	}
 	if _, err := store.Load(1); err == nil {
 		t.Fatal("Load(invalid JSON) error = nil")
+	}
+
+	if err := os.WriteFile(filepath.Join(directory, "runtime.json"), []byte("{"), 0o600); err != nil {
+		t.Fatalf("write invalid runtime state: %v", err)
+	}
+	if _, err := store.LoadRuntime(); err == nil {
+		t.Fatal("LoadRuntime(invalid JSON) error = nil")
 	}
 }
 

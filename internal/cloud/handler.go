@@ -26,9 +26,10 @@ type DriverFactory func(plant config.Plant, logger logbuf.Logger) (driver.Driver
 
 // HandlerOptions supplies response metadata and test seams.
 type HandlerOptions struct {
-	Version       string
-	Environment   string
-	DriverFactory DriverFactory
+	Version            string
+	Environment        string
+	DriverFactory      DriverFactory
+	LogLevelController LogLevelController
 }
 
 // RequestHandler serializes and processes cloud requests for one plant.
@@ -39,6 +40,7 @@ type RequestHandler struct {
 	version     string
 	environment string
 	newDriver   DriverFactory
+	logLevel    LogLevelController
 	token       chan struct{}
 }
 
@@ -54,6 +56,9 @@ func NewRequestHandler(
 	}
 	if publisher == nil {
 		return nil, errors.New("request handler publisher is required")
+	}
+	if options.LogLevelController == nil {
+		return nil, errors.New("request handler log level controller is required")
 	}
 	if logger == nil {
 		logger = noopLogger{}
@@ -82,6 +87,7 @@ func NewRequestHandler(
 		version:     version,
 		environment: environment,
 		newDriver:   factory,
+		logLevel:    options.LogLevelController,
 		token:       make(chan struct{}, 1),
 	}
 	handler.token <- struct{}{}
@@ -117,6 +123,9 @@ func (handler *RequestHandler) Handle(ctx context.Context, payload []byte) error
 
 	header.GBBVersion = stringPointer(handler.version)
 	header.GBBEnvironment = stringPointer(handler.environment)
+	if err := handler.applyLogLevel(header); err != nil {
+		return err
+	}
 	handler.execute(ctx, header)
 
 	response, err := protocol.Encode(header)
@@ -130,6 +139,25 @@ func (handler *RequestHandler) Handle(ctx context.Context, payload []byte) error
 		responseQoS,
 	); err != nil {
 		return fmt.Errorf("publish cloud response: %w", err)
+	}
+	return nil
+}
+
+func (handler *RequestHandler) applyLogLevel(header *protocol.Header) error {
+	if header.LogLevel == nil {
+		return nil
+	}
+
+	err := handler.logLevel.ApplyCloudLevel(*header.LogLevel)
+	if errors.Is(err, logbuf.ErrUnknownCloudLevel) {
+		handler.logger.Warn(
+			"unknown cloud log level",
+			"log_level", *header.LogLevel,
+		)
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("apply cloud log level: %w", err)
 	}
 	return nil
 }

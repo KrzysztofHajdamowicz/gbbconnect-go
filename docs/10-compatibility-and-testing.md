@@ -149,7 +149,7 @@ Exception path: `resp[8] > 127` with `resp[9]=0x02` -> error
       60 s keepalive, 5 min backoff.
 - [ ] Sub-inverter routing resolves dongle serial/address/port and errors with
       the exact not-found message when missing.
-- [ ] LogLevel remote control updates verbosity and persists.
+- [x] LogLevel remote control updates verbosity and persists.
 - [ ] New transports (RTU-over-TCP, serial) round-trip a read and a write
       against their mocks, with CRC validation.
 - [ ] Discovery returns serials from a mock dongle responder on UDP 48899.

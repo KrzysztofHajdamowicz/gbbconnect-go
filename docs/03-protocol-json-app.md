@@ -179,6 +179,7 @@ section).
 
 - [x] PascalCase JSON field names; null fields omitted on encode.
 - [x] Lenient decode (trailing commas, case-insensitive LogLevel/hex).
+- [x] Remote LogLevel control updates live logging and persists across restart.
 - [x] Per-line execution overwrites `Modbus` with the response hex.
 - [x] Error cascading: first failure nulls this + remaining lines and breaks.
 - [x] Global failure nulls all lines and sets `Header.Error`.

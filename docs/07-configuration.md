@@ -179,6 +179,15 @@ The original persists per-plant runtime state to
 { "last_log_date": "2026-03-10", "last_log_pos": 12345 }
 ```
 
+- Global runtime override file `state/runtime.json`:
+
+```json
+{ "log_level": "Max" }
+```
+
+  This stores the last valid cloud `LogLevel` (`OnlyErrors`, `Min`, or `Max`)
+  without rewriting the source YAML/JSON configuration. It is restored when
+  the logging runtime is initialized.
 - Saved after each response publish and on shutdown (original
   `OurSaveState` / `OurStopJobs`).
 - Writes must be atomic (write temp + rename), matching the original
