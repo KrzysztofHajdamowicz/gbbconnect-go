@@ -27,6 +27,12 @@ func TestCRC16GoldenVectors(t *testing.T) {
 			lo:    0xC5,
 			hi:    0xCD,
 		},
+		{
+			name:  "captured inverter read",
+			frame: []byte{0x01, 0x03, 0x02, 0x04, 0x00, 0x03, 0x00, 0x00},
+			lo:    0x45,
+			hi:    0xB2,
+		},
 	}
 
 	for _, test := range tests {

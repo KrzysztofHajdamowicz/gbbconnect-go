@@ -57,7 +57,7 @@ Authoritative sources:
   "OrderId": "read-batch-001",
   "Lines": [
     { "LineNo": 1, "Modbus": "0103009C0003C5E5" },
-    { "LineNo": 2, "Modbus": "0103009F0001D4C8" }
+    { "LineNo": 2, "Modbus": "0103009F0001B424" }
   ]
 }
 ```
@@ -68,7 +68,7 @@ Authoritative sources:
 {
   "OrderId": "read-batch-001",
   "Lines": [
-    { "LineNo": 1, "Modbus": "0103060012003400560BF4" },
+    { "LineNo": 1, "Modbus": "0103060012003400565886" },
     { "LineNo": 2, "Modbus": "01030200FFxxxx" }
   ],
   "GbbVersion": "1.3.0-go",

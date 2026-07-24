@@ -100,10 +100,11 @@ i.e. drop the first 25 bytes and the trailing checksum+end (2 bytes). Require th
 result length `>= 5` else "frame does not contain a valid Modbus RTU frame". The
 returned bytes are a full Modbus RTU frame **including its CRC**.
 
-> The byte at offset 0x06 (request padding) vs the response layout: in the
-> request the serial starts at 0x07; on extraction the code reads serial at
-> offsets 7..10 and modbus at 25, consistent with the same header layout for
-> responses.
+> The request and response payload headers are asymmetric. `CreateFrame` places
+> request Modbus at offset `0x1A` (26), after its 15-byte payload header.
+> `GetModBusFrame` deliberately extracts response Modbus from offset 25. A
+> production GbbConnect2 capture confirms offset 26 for all requests and offset
+> 25 for all corresponding responses.
 
 ## 4. Sequence number
 
@@ -196,12 +197,13 @@ Request Modbus RTU: `01 03 00 9C 00 03 C5 E5`
 
 V5 frame:
 ```
-A5 17 00 10 45 2A 00 78 56 34 12 02 00 00 00 00 00 00 00 00 00 00 00 00 00
-01 03 00 9C 00 03 C5 E5 <checksum> 15
+A5 17 00 10 45 2A 00 78 56 34 12 02 00 00 00 00 00 00
+00 00 00 00 00 00 00 00 01 03 00 9C 00 03 C5 E5 F9 15
 ```
 - `17 00` = length = 8 + 15 = 23 (0x0017) little-endian.
 - `2A 00` = seq 0x2A, padding 0.
 - `78 56 34 12` = serial 0x12345678 little-endian.
+- `F9` = request checksum.
 
 The inverter's V5 response carries a Modbus RTU response such as
 `01 03 06 00 12 00 34 00 56 <crc>` which is extracted from offset 25..len-2 and

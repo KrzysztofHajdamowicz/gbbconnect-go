@@ -31,6 +31,19 @@ wins**. Known discrepancies to watch:
   the wire in the original); correlation only requires echo-match. See
   [05-protocol-modbus.md](05-protocol-modbus.md) §4.
 
+### Production capture validation
+
+An offline analysis of a production GbbConnect2 capture from 2026-07-24
+validated 1,207 complete request/response exchanges without adding the raw log
+or its device identifiers to this repository:
+
+- all 1,207 outgoing and incoming Modbus RTU frames passed CRC validation;
+- 1,189 exchanges used function `0x03`, and 18 used function `0x10`;
+- every request wrapper contained its RTU frame at offset 26;
+- every response wrapper contained its RTU frame at offset 25;
+- all sequence numbers and serial fields matched within their exchanges;
+- no retry, wrong-sequence, Modbus exception, or CRC-error event occurred.
+
 ## 3. Golden vectors: CRC-16 (0xA001)
 
 | Input (hex, full frame incl. CRC slot or PDU) | CRC `lo hi` |
@@ -59,16 +72,16 @@ RTU `01 03 00 9C 00 03 C5 E5`.
 
 Expected request frame (checksum byte computed per spec):
 ```
-A5 17 00 10 45 2A 00 78 56 34 12 02 00 00 00 00
-00 00 00 00 00 00 00 00 00 01 03 00 9C 00 03 D5
-CA <CK> 15
+A5 17 00 10 45 2A 00 78 56 34 12 02 00 00 00 00 00 00
+00 00 00 00 00 00 00 00 01 03 00 9C 00 03 C5 E5 F9 15
 ```
 - `17 00` = length 0x0017 = len(rtu=8)+15 = 23.
 - `2A 00` = seq, padding.
 - `78 56 34 12` = serial little-endian.
-- `<CK>` = `sum(frame[1..len-2]) & 0xFF`.
+- Request Modbus begins at offset 26; response Modbus begins at offset 25.
+- `F9` = `sum(frame[1..len-2]) & 0xFF`.
 
-Implementers must compute `<CK>` in code and assert the full frame equals the
+Implementers must compute the checksum in code and assert the full frame equals the
 builder output; also assert the parser, given a synthetic response frame (control
 `10 15`, matching serial/seq, frame type `02`), extracts the inner RTU from
 offset 25..len-2.
