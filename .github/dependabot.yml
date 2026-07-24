@@ -1,0 +1,33 @@
+version: 2
+updates:
+  - package-ecosystem: "gomod"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    cooldown:
+      default-days: 7
+    assignees:
+      - "KrzysztofHajdamowicz"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    cooldown:
+      default-days: 7
+    assignees:
+      - "KrzysztofHajdamowicz"
+
+  - package-ecosystem: "docker"
+    directories:
+      - "/deploy"
+      - "/deploy/addon"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    cooldown:
+      default-days: 7
+    assignees:
+      - "KrzysztofHajdamowicz"
