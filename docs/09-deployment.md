@@ -25,26 +25,17 @@ Go cross-compiles trivially. Target matrix:
 
 ## 2. Docker (multi-arch)
 
-Goal: tiny image, non-root, multi-arch via buildx. Sketch (final in ticket
-GC-070):
+The production image is defined by [`../deploy/Dockerfile`](../deploy/Dockerfile).
+It uses a cached Go build stage and a `scratch` runtime containing only the
+static binary and the CA certificate bundle required by MQTT/TLS. It runs as
+UID/GID `65532` and supports `linux/amd64`, `linux/arm64`, and `linux/arm/v7`
+through buildx:
 
-```dockerfile
-# build stage
-FROM --platform=$BUILDPLATFORM golang:1.22 AS build
-WORKDIR /src
-COPY go.mod go.sum ./
-RUN go mod download
-COPY . .
-ARG TARGETOS TARGETARCH
-RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
-    go build -ldflags "-s -w" -o /out/gbbconnect ./cmd/gbbconnect
-
-# runtime stage
-FROM gcr.io/distroless/static-debian12:nonroot
-COPY --from=build /out/gbbconnect /usr/local/bin/gbbconnect
-USER nonroot:nonroot
-ENTRYPOINT ["/usr/local/bin/gbbconnect"]
-CMD ["run", "--config", "/config/gbbconnect.yaml"]
+```bash
+docker buildx build \
+  --platform linux/amd64,linux/arm64,linux/arm/v7 \
+  --build-arg VERSION="$(git describe --tags --always --dirty)" \
+  -f deploy/Dockerfile .
 ```
 
 Run:
@@ -57,9 +48,11 @@ docker run -d --name gbbconnect --restart unless-stopped \
 ```
 
 Notes:
-- `modbus_serial` requires `--device /dev/ttyUSB0` (and the container user must
-  have access).
-- State volume at `/data` for per-plant state + logs.
+- `/config` should be a read-only bind mount containing `gbbconnect.yaml`.
+- `/data` must be writable by UID/GID `65532`; the named-volume example above
+  inherits the correct ownership from the image. It stores state and daily logs.
+- `modbus_serial` additionally requires `--device /dev/ttyUSB0` and access for
+  UID/GID `65532` (for example an appropriate host device group or udev rule).
 
 ## 3. Home Assistant Add-on
 

@@ -1,0 +1,11 @@
+.git
+.github
+.agents
+.codex
+.vscode
+bin
+dist
+docs
+config.dupa
+*.log
+coverage.out
