@@ -1,0 +1,2 @@
+# transaction=0x0001 in original little-endian order, protocol=0, length=6
+01 00 00 00 00 06 01 03 00 9C 00 03

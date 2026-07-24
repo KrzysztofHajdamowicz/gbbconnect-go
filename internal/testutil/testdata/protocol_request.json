@@ -1,0 +1,7 @@
+{
+  "OrderId": "read-batch-001",
+  "Lines": [
+    {"LineNo": 1, "Modbus": "0103009C0003C5E5"},
+    {"LineNo": 2, "Modbus": "0103009F0001B424"}
+  ]
+}

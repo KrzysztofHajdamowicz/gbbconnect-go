@@ -30,8 +30,19 @@ jobs:
         uses: golangci/golangci-lint-action@v9
         with:
           version: ${{ env.GOLANGCI_LINT_VERSION }}
-      - name: Test with race detector
-        run: go test ./... -race -count=1
+      - name: Test with race detector and coverage
+        run: make coverage
+      - name: Enforce protocol coverage
+        run: make coverage-protocol
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage
+          path: |
+            coverage.out
+            coverage.txt
+            coverage.html
+          if-no-files-found: error
 
   cross-build:
     name: Cross-compile static binaries
@@ -60,4 +71,3 @@ jobs:
             echo "linux/amd64 artifact is dynamically linked"
             exit 1
           fi
-

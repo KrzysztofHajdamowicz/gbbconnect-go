@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"testing"
 	"testing/quick"
+
+	"github.com/KrzysztofHajdamowicz/gbbconnect-go/internal/testutil"
 )
 
 func TestCRC16GoldenVectors(t *testing.T) {
@@ -52,10 +54,8 @@ func TestBuildReadHoldingRegistersGoldenVector(t *testing.T) {
 	t.Parallel()
 
 	got := BuildReadHoldingRegisters(1, 0x009C, 3)
-	want := []byte{0x01, 0x03, 0x00, 0x9C, 0x00, 0x03, 0xC5, 0xE5}
-	if !bytes.Equal(got, want) {
-		t.Fatalf("BuildReadHoldingRegisters() = %X, want %X", got, want)
-	}
+	want := testutil.ReadHexFixture(t, "modbus_read_rtu.hex")
+	testutil.AssertBytesEqual(t, got, want)
 	if !ValidateCRC(got) {
 		t.Fatal("BuildReadHoldingRegisters() returned an invalid CRC")
 	}
@@ -154,7 +154,7 @@ func TestAppendCRCProperty(t *testing.T) {
 func TestHexGoldenVectorAndErrors(t *testing.T) {
 	t.Parallel()
 
-	frame := []byte{0x01, 0x03, 0x00, 0x9C, 0x00, 0x03, 0xC5, 0xE5}
+	frame := testutil.ReadHexFixture(t, "modbus_read_rtu.hex")
 	const encoded = "0103009C0003C5E5"
 	if got := EncodeHex(frame); got != encoded {
 		t.Fatalf("EncodeHex() = %q, want %q", got, encoded)
@@ -165,9 +165,7 @@ func TestHexGoldenVectorAndErrors(t *testing.T) {
 		if err != nil {
 			t.Fatalf("DecodeHex(%q) error = %v", input, err)
 		}
-		if !bytes.Equal(decoded, frame) {
-			t.Fatalf("DecodeHex(%q) = %X, want %X", input, decoded, frame)
-		}
+		testutil.AssertBytesEqual(t, decoded, frame)
 	}
 
 	if _, err := DecodeHex("ABC"); err == nil {

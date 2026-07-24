@@ -310,6 +310,148 @@ func TestReadFrameReportsConnectionLost(t *testing.T) {
 	}
 }
 
+func TestTransportConnectContextAndExistingConnection(t *testing.T) {
+	t.Parallel()
+
+	transport := New(
+		config.Plant{
+			Address: "127.0.0.1",
+			Port:    defaultPort,
+			Serial:  testSerial,
+		},
+		nil,
+	)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if err := transport.Connect(ctx); !errors.Is(err, context.Canceled) {
+		t.Fatalf("Connect(canceled) error = %v, want context.Canceled", err)
+	}
+
+	transport.conn = &scriptedConnection{}
+	if err := transport.Connect(context.Background()); err != nil {
+		t.Fatalf("Connect(existing connection) error = %v", err)
+	}
+}
+
+func TestTransportFrameIOErrors(t *testing.T) {
+	t.Parallel()
+
+	injected := errors.New("injected failure")
+	newTransport := func(connection net.Conn) *Transport {
+		transport := New(
+			config.Plant{
+				Address: "127.0.0.1",
+				Port:    defaultPort,
+				Serial:  testSerial,
+			},
+			nil,
+		)
+		transport.conn = connection
+		transport.timeout = time.Second
+		return transport
+	}
+
+	t.Run("read deadline", func(t *testing.T) {
+		transport := newTransport(&scriptedConnection{
+			readDeadlineError: injected,
+		})
+		_, err := transport.readFrameLocked(context.Background())
+		if !errors.Is(err, injected) {
+			t.Fatalf("readFrameLocked() error = %v", err)
+		}
+	})
+	t.Run("partial header", func(t *testing.T) {
+		transport := newTransport(&scriptedConnection{
+			reader: bytes.NewReader([]byte{startByte}),
+		})
+		_, err := transport.readFrameLocked(context.Background())
+		if err == nil || err.Error() != "read SolarmanV5 header: unexpected EOF" {
+			t.Fatalf("readFrameLocked() error = %v", err)
+		}
+	})
+	t.Run("invalid length", func(t *testing.T) {
+		header := []byte{startByte, 0xFF, 0xFF}
+		transport := newTransport(&scriptedConnection{
+			reader: bytes.NewReader(header),
+		})
+		_, err := transport.readFrameLocked(context.Background())
+		if err == nil ||
+			err.Error() != "invalid SolarmanV5 frame length: 65548" {
+			t.Fatalf("readFrameLocked() error = %v", err)
+		}
+	})
+	t.Run("partial body", func(t *testing.T) {
+		header := []byte{startByte, 0x0D, 0x00}
+		transport := newTransport(&scriptedConnection{
+			reader: bytes.NewReader(append(header, 0x01)),
+		})
+		_, err := transport.readFrameLocked(context.Background())
+		if err == nil || err.Error() != "read SolarmanV5 frame: unexpected EOF" {
+			t.Fatalf("readFrameLocked() error = %v", err)
+		}
+	})
+	t.Run("write deadline", func(t *testing.T) {
+		transport := newTransport(&scriptedConnection{
+			writeDeadlineError: injected,
+		})
+		err := transport.writeFrameLocked(context.Background(), []byte{0x01})
+		if !errors.Is(err, injected) {
+			t.Fatalf("writeFrameLocked() error = %v", err)
+		}
+	})
+	t.Run("zero-byte write", func(t *testing.T) {
+		transport := newTransport(&scriptedConnection{
+			writer: writerFunc(func([]byte) (int, error) { return 0, nil }),
+		})
+		err := transport.writeFrameLocked(context.Background(), []byte{0x01})
+		if !errors.Is(err, io.ErrUnexpectedEOF) {
+			t.Fatalf("writeFrameLocked() error = %v, want unexpected EOF", err)
+		}
+	})
+	t.Run("close", func(t *testing.T) {
+		transport := newTransport(&scriptedConnection{closeError: injected})
+		if err := transport.Close(); !errors.Is(err, injected) {
+			t.Fatalf("Close() error = %v", err)
+		}
+		if transport.conn != nil {
+			t.Fatal("Close() did not clear connection after an error")
+		}
+	})
+}
+
+func TestTransportTimingAndAddressHelpers(t *testing.T) {
+	t.Parallel()
+
+	if got, err := resolveFirst(context.Background(), "127.0.0.1"); err != nil ||
+		got != "127.0.0.1" {
+		t.Fatalf("resolveFirst() = %q, %v", got, err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if err := waitContext(ctx, time.Second); !errors.Is(err, context.Canceled) {
+		t.Fatalf("waitContext(canceled) error = %v", err)
+	}
+	if err := waitContext(context.Background(), 0); err != nil {
+		t.Fatalf("waitContext(zero) error = %v", err)
+	}
+	if err := waitContext(context.Background(), time.Millisecond); err != nil {
+		t.Fatalf("waitContext(timer) error = %v", err)
+	}
+
+	contextDeadline := time.Now().Add(time.Second)
+	deadlineContext, stop := context.WithDeadline(
+		context.Background(),
+		contextDeadline,
+	)
+	defer stop()
+	got := deadline(deadlineContext, time.Hour)
+	if got.Sub(contextDeadline) > time.Millisecond ||
+		contextDeadline.Sub(got) > time.Millisecond {
+		t.Fatalf("deadline() = %v, want %v", got, contextDeadline)
+	}
+}
+
 type eofConnection struct{}
 
 func (eofConnection) Read([]byte) (int, error)         { return 0, io.EOF }
@@ -320,6 +462,50 @@ func (eofConnection) RemoteAddr() net.Addr             { return nil }
 func (eofConnection) SetDeadline(time.Time) error      { return nil }
 func (eofConnection) SetReadDeadline(time.Time) error  { return nil }
 func (eofConnection) SetWriteDeadline(time.Time) error { return nil }
+
+type writerFunc func([]byte) (int, error)
+
+func (write writerFunc) Write(data []byte) (int, error) {
+	return write(data)
+}
+
+type scriptedConnection struct {
+	reader             io.Reader
+	writer             io.Writer
+	closeError         error
+	readDeadlineError  error
+	writeDeadlineError error
+}
+
+func (connection *scriptedConnection) Read(data []byte) (int, error) {
+	if connection.reader == nil {
+		return 0, io.EOF
+	}
+	return connection.reader.Read(data)
+}
+
+func (connection *scriptedConnection) Write(data []byte) (int, error) {
+	if connection.writer == nil {
+		return len(data), nil
+	}
+	return connection.writer.Write(data)
+}
+
+func (connection *scriptedConnection) Close() error {
+	return connection.closeError
+}
+
+func (*scriptedConnection) LocalAddr() net.Addr  { return nil }
+func (*scriptedConnection) RemoteAddr() net.Addr { return nil }
+func (*scriptedConnection) SetDeadline(time.Time) error {
+	return nil
+}
+func (connection *scriptedConnection) SetReadDeadline(time.Time) error {
+	return connection.readDeadlineError
+}
+func (connection *scriptedConnection) SetWriteDeadline(time.Time) error {
+	return connection.writeDeadlineError
+}
 
 type traceLogger struct {
 	mu       sync.Mutex

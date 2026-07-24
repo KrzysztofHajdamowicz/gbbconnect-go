@@ -16,6 +16,18 @@ original, and the golden test vectors implementers must satisfy.
 | Transports (real I/O) | Loopback TCP server / serial pty + recorded fixtures |
 | End-to-end | Mock MQTT broker + mock inverter (§7) |
 
+Shared wire fixtures live in [`../internal/testutil/testdata`](../internal/testutil/testdata)
+and are embedded by `internal/testutil`, so tests can use the same vectors
+without depending on their working directory. Byte comparisons use a shared
+assertion that reports the first mismatching offset and a complete hexadecimal
+diff.
+
+`make coverage` runs the race-enabled suite and creates `coverage.out`,
+`coverage.txt`, and `coverage.html`. CI uploads all three files. `make
+coverage-protocol` separately enforces at least 85% statement coverage for
+`internal/modbus`, `internal/driver/solarmanv5`,
+`internal/driver/modbustcp`, and `internal/protocol`.
+
 ## 2. Authoritative source of truth
 
 Where this doc/the design notes disagree with the actual C#, the **C# source
@@ -141,9 +153,9 @@ Exception path: `resp[8] > 127` with `resp[9]=0x02` -> error
 
 ## 8. Acceptance matrix (must pass for "compatible")
 
-- [ ] CRC and RTU header vectors (§3) pass.
-- [ ] SolarmanV5 build + parse vectors (§4) pass, including all negative cases.
-- [ ] Modbus TCP build + parse + exception vectors (§5) pass.
+- [x] CRC and RTU header vectors (§3) pass.
+- [x] SolarmanV5 build + parse vectors (§4) pass, including all negative cases.
+- [x] Modbus TCP build + parse + exception vectors (§5) pass.
 - [x] JSON encode/decode + null omission + error cascading (§6) pass.
 - [x] MQTT: correct client id, topics, QoS (sub 1 / keepalive 1 / response 2),
       60 s keepalive, 5 min backoff.

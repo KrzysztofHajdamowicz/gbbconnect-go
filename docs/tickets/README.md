@@ -188,7 +188,7 @@ it to `IN PROGRESS` / `DONE` (or track in your issue tracker if importing).
 | GC-072 | H | Medium | DONE |
 | GC-073 | H | Low | DONE |
 | GC-074 | H | Medium | DONE |
-| GC-080 | I | High | TODO |
+| GC-080 | I | High | DONE |
 | GC-081 | I | Medium | TODO |
 | GC-082 | I | Medium | TODO |
 | GC-083 | I | Medium | TODO |

@@ -1,21 +1,18 @@
 package protocol
 
 import (
+	"bytes"
 	"encoding/json"
 	"strings"
 	"testing"
+
+	"github.com/KrzysztofHajdamowicz/gbbconnect-go/internal/testutil"
 )
 
 func TestDecodeRequestExample(t *testing.T) {
 	t.Parallel()
 
-	data := []byte(`{
-		"OrderId": "read-batch-001",
-		"Lines": [
-			{ "LineNo": 1, "Modbus": "0103009C0003C5E5" },
-			{ "LineNo": 2, "Modbus": "0103009F0001B424" }
-		]
-	}`)
+	data := testutil.ReadFixture(t, "protocol_request.json")
 	header, err := Decode(data)
 	if err != nil {
 		t.Fatalf("Decode() error = %v", err)
@@ -152,6 +149,11 @@ func TestEncodeOmitsNilFieldsAndUsesPascalCase(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Encode() error = %v", err)
 	}
+	testutil.AssertBytesEqual(
+		t,
+		data,
+		bytes.TrimSpace(testutil.ReadFixture(t, "protocol_response.json")),
+	)
 
 	var decoded map[string]json.RawMessage
 	if err := json.Unmarshal(data, &decoded); err != nil {

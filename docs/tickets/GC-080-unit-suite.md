@@ -3,7 +3,7 @@
 - **Epic:** I - Testing & QA
 - **Type:** Test
 - **Priority:** High
-- **Status:** TODO
+- **Status:** DONE
 - **Estimate:** 1 day (ongoing)
 - **Depends on:** GC-020
 - **Blocks:** -

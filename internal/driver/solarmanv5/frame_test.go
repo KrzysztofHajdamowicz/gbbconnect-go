@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/KrzysztofHajdamowicz/gbbconnect-go/internal/modbus"
+	"github.com/KrzysztofHajdamowicz/gbbconnect-go/internal/testutil"
 )
 
 const testSerial int64 = 0x12345678
@@ -13,37 +14,29 @@ const testSerial int64 = 0x12345678
 func TestCreateFrameGoldenVector(t *testing.T) {
 	t.Parallel()
 
-	rtu := []byte{0x01, 0x03, 0x00, 0x9C, 0x00, 0x03, 0xC5, 0xE5}
+	rtu := testutil.ReadHexFixture(t, "modbus_read_rtu.hex")
 	got := CreateFrame(0x2A, testSerial, rtu)
-	want := []byte{
-		0xA5, 0x17, 0x00, 0x10, 0x45, 0x2A, 0x00, 0x78,
-		0x56, 0x34, 0x12, 0x02, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x01, 0x03, 0x00, 0x9C, 0x00, 0x03,
-		0xC5, 0xE5, 0xF9, 0x15,
-	}
-	if !bytes.Equal(got, want) {
-		t.Fatalf("CreateFrame() = %X, want %X", got, want)
-	}
-	if !bytes.Equal(rtu, []byte{0x01, 0x03, 0x00, 0x9C, 0x00, 0x03, 0xC5, 0xE5}) {
-		t.Fatalf("CreateFrame() mutated RTU: %X", rtu)
-	}
+	want := testutil.ReadHexFixture(t, "solarman_v5_request.hex")
+	testutil.AssertBytesEqual(t, got, want)
+	testutil.AssertBytesEqual(
+		t,
+		rtu,
+		testutil.ReadHexFixture(t, "modbus_read_rtu.hex"),
+	)
 }
 
 func TestParseFrameExtractsRTUAndIgnoresChecksum(t *testing.T) {
 	t.Parallel()
 
-	rtu := modbus.AppendCRC([]byte{0x01, 0x03, 0x02, 0x12, 0x34})
-	frame := buildResponseFrame(0x2A, testSerial, rtu)
+	rtu := modbus.AppendCRC([]byte{0x01, 0x03, 0x02, 0x00, 0xFF})
+	frame := testutil.ReadHexFixture(t, "solarman_v5_response.hex")
 	frame[len(frame)-2] ^= 0xFF
 
 	got, err := ParseFrame(0x2A, testSerial, frame)
 	if err != nil {
 		t.Fatalf("ParseFrame() error = %v", err)
 	}
-	if !bytes.Equal(got, rtu) {
-		t.Fatalf("ParseFrame() = %X, want %X", got, rtu)
-	}
+	testutil.AssertBytesEqual(t, got, rtu)
 
 	frame[responseRTUOffset] ^= 0xFF
 	if bytes.Equal(got, frame[responseRTUOffset:len(frame)-2]) {

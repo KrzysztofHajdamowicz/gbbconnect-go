@@ -1,33 +1,28 @@
 package modbustcp
 
 import (
-	"bytes"
 	"encoding/binary"
 	"testing"
 
 	"github.com/KrzysztofHajdamowicz/gbbconnect-go/internal/modbus"
+	"github.com/KrzysztofHajdamowicz/gbbconnect-go/internal/testutil"
 )
 
 func TestBuildRequestGoldenVector(t *testing.T) {
 	t.Parallel()
 
-	rtu := []byte{0x01, 0x03, 0x00, 0x9C, 0x00, 0x03, 0xC5, 0xE5}
+	rtu := testutil.ReadHexFixture(t, "modbus_read_rtu.hex")
 	got, err := BuildRequest(0x0001, rtu)
 	if err != nil {
 		t.Fatalf("BuildRequest() error = %v", err)
 	}
-	want := []byte{
-		0x01, 0x00,
-		0x00, 0x00,
-		0x00, 0x06,
-		0x01, 0x03, 0x00, 0x9C, 0x00, 0x03,
-	}
-	if !bytes.Equal(got, want) {
-		t.Fatalf("BuildRequest() = %X, want %X", got, want)
-	}
-	if !bytes.Equal(rtu, []byte{0x01, 0x03, 0x00, 0x9C, 0x00, 0x03, 0xC5, 0xE5}) {
-		t.Fatalf("BuildRequest() mutated RTU: %X", rtu)
-	}
+	want := testutil.ReadHexFixture(t, "modbus_tcp_request.hex")
+	testutil.AssertBytesEqual(t, got, want)
+	testutil.AssertBytesEqual(
+		t,
+		rtu,
+		testutil.ReadHexFixture(t, "modbus_read_rtu.hex"),
+	)
 }
 
 func TestBuildRequestLimits(t *testing.T) {
@@ -44,20 +39,13 @@ func TestBuildRequestLimits(t *testing.T) {
 func TestParseResponseRebuildsCRC(t *testing.T) {
 	t.Parallel()
 
-	response := []byte{
-		0x01, 0x00,
-		0x00, 0x00,
-		0x00, 0x05,
-		0x01, 0x03, 0x02, 0x00, 0xFF,
-	}
+	response := testutil.ReadHexFixture(t, "modbus_tcp_response.hex")
 	got, err := ParseResponse(1, response)
 	if err != nil {
 		t.Fatalf("ParseResponse() error = %v", err)
 	}
 	want := modbus.AppendCRC([]byte{0x01, 0x03, 0x02, 0x00, 0xFF})
-	if !bytes.Equal(got, want) {
-		t.Fatalf("ParseResponse() = %X, want %X", got, want)
-	}
+	testutil.AssertBytesEqual(t, got, want)
 	if !modbus.ValidateCRC(got) {
 		t.Fatalf("ParseResponse() returned invalid CRC: %X", got)
 	}
