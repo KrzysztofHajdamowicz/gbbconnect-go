@@ -177,8 +177,8 @@ section).
 
 ## 9. Compatibility checklist
 
-- [ ] PascalCase JSON field names; null fields omitted on encode.
-- [ ] Lenient decode (trailing commas, case-insensitive LogLevel/hex).
+- [x] PascalCase JSON field names; null fields omitted on encode.
+- [x] Lenient decode (trailing commas, case-insensitive LogLevel/hex).
 - [ ] Per-line execution overwrites `Modbus` with the response hex.
 - [ ] Error cascading: first failure nulls this + remaining lines and breaks.
 - [ ] Global failure nulls all lines and sets `Header.Error`.
