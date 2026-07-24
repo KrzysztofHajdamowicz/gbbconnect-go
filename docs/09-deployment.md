@@ -119,13 +119,28 @@ validation, update, and serial instructions are in
 
 ## 5. Windows Service
 
-The binary should support running as a Windows Service (ticket GC-073):
-- Use `golang.org/x/sys/windows/svc` to detect service context and run the
-  service control handler; fall back to console mode when run interactively.
-- Provide `install` / `uninstall` subcommands (or document `sc.exe create`).
-- Config at `%ProgramData%\gbbconnect\gbbconnect.yaml`; state at
-  `%ProgramData%\gbbconnect\state`.
-- Logs to the Windows Event Log and/or stdout.
+The Windows binary detects whether Service Control Manager started it. In that
+context it reports service state through `golang.org/x/sys/windows/svc` and
+maps STOP/SHUTDOWN to the daemon's graceful cancellation path. When launched
+interactively, the same EXE remains a foreground CLI.
+
+From an elevated PowerShell session, after copying the binary to its permanent
+location and creating the configuration:
+
+```powershell
+.\gbbconnect.exe config validate `
+  --config "$env:ProgramData\gbbconnect\gbbconnect.yaml"
+.\gbbconnect.exe service install
+sc.exe start gbbconnect
+sc.exe query gbbconnect
+```
+
+The installer registers an automatically started service, stores explicit
+`%ProgramData%\gbbconnect` configuration/state arguments, and creates an
+Application Event Log source named `gbbconnect`. Stop the service before
+running `gbbconnect service uninstall`; configuration and state are preserved.
+See [`../deploy/windows/README.md`](../deploy/windows/README.md) for complete
+install, Event Viewer, update, and uninstall instructions.
 
 ## 6. Operational behaviour summary
 

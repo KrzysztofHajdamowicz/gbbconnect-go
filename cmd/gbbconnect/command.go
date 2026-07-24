@@ -84,6 +84,7 @@ func newRootCommandWithDependencies(
 			},
 		},
 	)
+	addPlatformCommands(root)
 
 	return root
 }

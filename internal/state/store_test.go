@@ -249,6 +249,15 @@ func TestResolveDirPrecedence(t *testing.T) {
 			},
 			want: filepath.Join(root, "default", "gbbconnect", "state"),
 		},
+		{
+			name: "Windows ProgramData",
+			options: DirOptions{
+				HADataDir:       filepath.Join(root, "missing-ha"),
+				LookupEnv:       mapEnvironment(map[string]string{"ProgramData": filepath.Join(root, "program-data")}),
+				OperatingSystem: "windows",
+			},
+			want: filepath.Join(root, "program-data", "gbbconnect", "state"),
+		},
 	}
 
 	for _, test := range tests {

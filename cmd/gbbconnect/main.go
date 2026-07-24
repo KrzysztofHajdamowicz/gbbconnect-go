@@ -9,6 +9,15 @@ import (
 var version = "dev"
 
 func main() {
+	handled, err := runAsPlatformService(version)
+	if handled {
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		return
+	}
+
 	ctx, stopSignals := newShutdownContext(
 		context.Background(),
 		defaultShutdownSignalDependencies(),

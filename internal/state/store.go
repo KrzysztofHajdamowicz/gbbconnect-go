@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sync"
 )
 
@@ -22,10 +23,11 @@ type RuntimeState struct {
 
 // DirOptions controls state-directory resolution.
 type DirOptions struct {
-	Path           string
-	HADataDir      string
-	DefaultDataDir string
-	LookupEnv      func(string) (string, bool)
+	Path            string
+	HADataDir       string
+	DefaultDataDir  string
+	LookupEnv       func(string) (string, bool)
+	OperatingSystem string
 }
 
 // Store atomically persists plant state files.
@@ -59,10 +61,22 @@ func ResolveDir(options DirOptions) (string, error) {
 
 	dataDir := options.DefaultDataDir
 	if dataDir == "" {
-		var err error
-		dataDir, err = os.UserConfigDir()
-		if err != nil {
-			return "", fmt.Errorf("resolve OS data directory: %w", err)
+		operatingSystem := options.OperatingSystem
+		if operatingSystem == "" {
+			operatingSystem = runtime.GOOS
+		}
+		if operatingSystem == "windows" {
+			if programData, ok := lookupEnv("ProgramData"); ok && programData != "" {
+				dataDir = programData
+			} else {
+				dataDir = `C:\ProgramData`
+			}
+		} else {
+			var err error
+			dataDir, err = os.UserConfigDir()
+			if err != nil {
+				return "", fmt.Errorf("resolve OS data directory: %w", err)
+			}
 		}
 	}
 	return filepath.Join(dataDir, "gbbconnect", "state"), nil

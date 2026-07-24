@@ -3,7 +3,7 @@
 - **Epic:** H - Packaging
 - **Type:** Feature
 - **Priority:** Low
-- **Status:** TODO
+- **Status:** DONE
 - **Estimate:** 1 day
 - **Depends on:** GC-062
 - **Blocks:** -
