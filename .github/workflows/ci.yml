@@ -71,3 +71,113 @@ jobs:
             echo "linux/amd64 artifact is dynamically linked"
             exit 1
           fi
+
+  windows-service:
+    name: Windows Service lifecycle
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Test Windows packages
+        run: go test ./... -count=1
+      - name: Build Windows executable
+        shell: pwsh
+        run: |
+          go build `
+            -trimpath `
+            -ldflags "-s -w -X main.version=ci-windows" `
+            -o "$env:RUNNER_TEMP\gbbconnect.exe" `
+            ./cmd/gbbconnect
+      - name: Exercise Service Control Manager lifecycle
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $binary = Join-Path $env:RUNNER_TEMP "gbbconnect.exe"
+          $dataDir = Join-Path $env:ProgramData "gbbconnect"
+          $config = Join-Path $dataDir "gbbconnect.yaml"
+          $installed = $false
+
+          New-Item -ItemType Directory -Force $dataDir | Out-Null
+          @'
+          version: 1
+          logging:
+            level: info
+          plants:
+            - number: 1
+              name: "Windows CI"
+              enabled: false
+              driver: random
+              cloud:
+                plant_id: "ci"
+                plant_token: ""
+                mqtt_address: "127.0.0.1"
+                mqtt_port: 1883
+                tls_insecure_skip_verify: false
+          '@ | Set-Content -Encoding utf8 $config
+
+          function Wait-ServiceStatus([string] $Wanted) {
+            for ($attempt = 0; $attempt -lt 30; $attempt++) {
+              $service = Get-Service -Name "gbbconnect" -ErrorAction SilentlyContinue
+              if ($null -ne $service -and $service.Status.ToString() -eq $Wanted) {
+                return
+              }
+              Start-Sleep -Seconds 1
+            }
+            throw "gbbconnect did not reach service state $Wanted"
+          }
+
+          try {
+            & $binary config validate --config $config
+            if ($LASTEXITCODE -ne 0) {
+              throw "configuration validation failed with exit code $LASTEXITCODE"
+            }
+
+            & $binary service install
+            if ($LASTEXITCODE -ne 0) {
+              throw "service install failed with exit code $LASTEXITCODE"
+            }
+            $installed = $true
+
+            sc.exe start gbbconnect
+            if ($LASTEXITCODE -ne 0) {
+              throw "sc.exe start failed with exit code $LASTEXITCODE"
+            }
+            Wait-ServiceStatus "Running"
+            sc.exe query gbbconnect
+
+            sc.exe stop gbbconnect
+            if ($LASTEXITCODE -ne 0) {
+              throw "sc.exe stop failed with exit code $LASTEXITCODE"
+            }
+            Wait-ServiceStatus "Stopped"
+
+            $events = Get-WinEvent -FilterHashtable @{
+              LogName = "Application"
+              ProviderName = "gbbconnect"
+            } -MaxEvents 50
+            if (-not ($events.Message -match "service starting")) {
+              throw "Windows Event Log has no service start event"
+            }
+            if (-not ($events.Message -match "service stopped")) {
+              throw "Windows Event Log has no graceful service stop event"
+            }
+            if (-not (Test-Path (Join-Path $dataDir "state") -PathType Container)) {
+              throw "service state directory was not created"
+            }
+          }
+          finally {
+            if ($installed) {
+              $service = Get-Service -Name "gbbconnect" -ErrorAction SilentlyContinue
+              if ($null -ne $service -and $service.Status -ne "Stopped") {
+                sc.exe stop gbbconnect
+                Wait-ServiceStatus "Stopped"
+              }
+              & $binary service uninstall
+              if ($LASTEXITCODE -ne 0) {
+                throw "service uninstall failed with exit code $LASTEXITCODE"
+              }
+            }
+          }

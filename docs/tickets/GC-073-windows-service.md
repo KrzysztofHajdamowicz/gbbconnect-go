@@ -35,5 +35,6 @@ Allow the binary to run as a Windows Service, in addition to console mode.
 
 ## Test notes
 
-- Manual validation on Windows: install, start, stop, uninstall.
-- CI builds the windows/amd64 target (GC-004) to catch compile breakage.
+- CI uses a native `windows-latest` runner to install, start, stop, and
+  uninstall the service through SCM, and verifies its Event Log lifecycle.
+- CI also builds the windows/amd64 target (GC-004) to catch compile breakage.
