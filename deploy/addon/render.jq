@@ -19,7 +19,8 @@
             baud: .serial_baud,
             data_bits: .serial_data_bits,
             parity: .serial_parity,
-            stop_bits: .serial_stop_bits
+            # Supervisor's list() schema coerces values to strings in options.json
+            stop_bits: (.serial_stop_bits | tonumber)
           },
           cloud: {
             plant_id: .cloud_plant_id,
