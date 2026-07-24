@@ -3,7 +3,7 @@
 - **Epic:** H - Packaging
 - **Type:** Chore
 - **Priority:** Medium
-- **Status:** TODO
+- **Status:** DONE
 - **Estimate:** 1 day
 - **Depends on:** GC-003, GC-004, GC-070
 - **Blocks:** -

@@ -1,0 +1,251 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: Validate release metadata
+    runs-on: ubuntu-latest
+    outputs:
+      addon_image: ${{ steps.release.outputs.addon_image }}
+      namespace: ${{ steps.release.outputs.namespace }}
+      main_image: ${{ steps.release.outputs.main_image }}
+      tag: ${{ steps.release.outputs.tag }}
+      version: ${{ steps.release.outputs.version }}
+    steps:
+      - uses: actions/checkout@v6
+      - name: Validate tag and add-on manifest
+        id: release
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "release tag must match vX.Y.Z, got: $RELEASE_TAG" >&2
+            exit 1
+          fi
+
+          version=${RELEASE_TAG#v}
+          manifest_version=$(awk -F '"' '/^version: / { print $2; exit }' deploy/addon/config.yaml)
+          if [[ "$manifest_version" != "$version" ]]; then
+            echo "tag version $version does not match add-on version $manifest_version" >&2
+            exit 1
+          fi
+
+          owner=${GITHUB_REPOSITORY_OWNER,,}
+          namespace=ghcr.io/$owner
+          main_image=$namespace/gbbconnect-go
+          addon_image=$namespace/gbbconnect-go-addon
+          manifest_image=$(awk -F '"' '/^image: / { print $2; exit }' deploy/addon/config.yaml)
+          if [[ "$manifest_image" != "$addon_image" ]]; then
+            echo "add-on image $manifest_image does not match release image $addon_image" >&2
+            exit 1
+          fi
+
+          echo "tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "namespace=$namespace" >> "$GITHUB_OUTPUT"
+          echo "main_image=$main_image" >> "$GITHUB_OUTPUT"
+          echo "addon_image=$addon_image" >> "$GITHUB_OUTPUT"
+
+  artifacts:
+    name: Build release archives
+    needs: prepare
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Test
+        run: go test ./... -race -count=1
+      - name: Build target matrix
+        env:
+          VERSION: ${{ needs.prepare.outputs.tag }}
+        run: make build-all
+      - name: Verify embedded version
+        env:
+          VERSION: ${{ needs.prepare.outputs.tag }}
+        run: |
+          test "$(dist/gbbconnect_linux_amd64 version)" = "gbbconnect version $VERSION"
+      - name: Package archives and checksums
+        run: |
+          ./scripts/package-release.sh \
+            "${{ needs.prepare.outputs.tag }}" \
+            dist \
+            release
+      - name: Verify release artifacts
+        run: |
+          tar -tzf "release/gbbconnect_${{ needs.prepare.outputs.tag }}_linux_amd64.tar.gz"
+          tar -tzf "release/gbbconnect_${{ needs.prepare.outputs.tag }}_linux_arm64.tar.gz"
+          tar -tzf "release/gbbconnect_${{ needs.prepare.outputs.tag }}_linux_arm_v7.tar.gz"
+          tar -tzf "release/gbbconnect_${{ needs.prepare.outputs.tag }}_darwin_arm64.tar.gz"
+          unzip -t "release/gbbconnect_${{ needs.prepare.outputs.tag }}_windows_amd64.zip"
+          cd release
+          sha256sum --check SHA256SUMS
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-artifacts
+          path: release/*
+          if-no-files-found: error
+
+  main-image:
+    name: Publish main multi-arch image
+    needs: prepare
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v6
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/setup-qemu-action@v4
+      - uses: docker/setup-buildx-action@v4
+      - name: Build and push
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: deploy/Dockerfile
+          platforms: linux/amd64,linux/arm64,linux/arm/v7
+          push: true
+          build-args: |
+            VERSION=${{ needs.prepare.outputs.tag }}
+          tags: |
+            ${{ needs.prepare.outputs.main_image }}:${{ needs.prepare.outputs.tag }}
+            ${{ needs.prepare.outputs.main_image }}:${{ needs.prepare.outputs.version }}
+            ${{ needs.prepare.outputs.main_image }}:latest
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ needs.prepare.outputs.tag }}
+          cache-from: type=gha,scope=release-main
+          cache-to: type=gha,mode=max,scope=release-main
+      - name: Inspect published manifest
+        run: |
+          docker buildx imagetools inspect \
+            "${{ needs.prepare.outputs.main_image }}:${{ needs.prepare.outputs.version }}"
+
+  addon-images:
+    name: Publish add-on image (${{ matrix.ha_arch }})
+    needs:
+      - prepare
+      - main-image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - ha_arch: amd64
+            platform: linux/amd64
+          - ha_arch: aarch64
+            platform: linux/arm64
+          - ha_arch: armv7
+            platform: linux/arm/v7
+    steps:
+      - uses: actions/checkout@v6
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/setup-qemu-action@v4
+      - uses: docker/setup-buildx-action@v4
+      - name: Build and push architecture image
+        uses: docker/build-push-action@v7
+        with:
+          context: deploy/addon
+          file: deploy/addon/Dockerfile
+          platforms: ${{ matrix.platform }}
+          push: true
+          provenance: false
+          sbom: false
+          build-args: |
+            BUILD_ARCH=${{ matrix.ha_arch }}
+            BUILD_VERSION=${{ needs.prepare.outputs.version }}
+            GBBCONNECT_IMAGE=${{ needs.prepare.outputs.main_image }}:${{ needs.prepare.outputs.version }}
+          tags: |
+            ${{ needs.prepare.outputs.namespace }}/${{ matrix.ha_arch }}-gbbconnect-go-addon:${{ needs.prepare.outputs.version }}
+          cache-from: type=gha,scope=release-addon-${{ matrix.ha_arch }}
+          cache-to: type=gha,mode=max,scope=release-addon-${{ matrix.ha_arch }}
+
+  addon-manifest:
+    name: Publish add-on multi-arch manifest
+    needs:
+      - prepare
+      - addon-images
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/setup-buildx-action@v4
+      - name: Create and inspect manifest
+        env:
+          ADDON_IMAGE: ${{ needs.prepare.outputs.addon_image }}
+          NAMESPACE: ${{ needs.prepare.outputs.namespace }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          docker buildx imagetools create \
+            --tag "$ADDON_IMAGE:$VERSION" \
+            --tag "$ADDON_IMAGE:latest" \
+            "$NAMESPACE/amd64-gbbconnect-go-addon:$VERSION" \
+            "$NAMESPACE/aarch64-gbbconnect-go-addon:$VERSION" \
+            "$NAMESPACE/armv7-gbbconnect-go-addon:$VERSION"
+          docker buildx imagetools inspect "$ADDON_IMAGE:$VERSION"
+
+  release:
+    name: Publish GitHub Release
+    needs:
+      - prepare
+      - artifacts
+      - main-image
+      - addon-manifest
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: release-artifacts
+          path: release
+      - name: Create release or replace its artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
+        run: |
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" release/* \
+              --clobber \
+              --repo "$GITHUB_REPOSITORY"
+          else
+            gh release create "$RELEASE_TAG" release/* \
+              --generate-notes \
+              --title "$RELEASE_TAG" \
+              --verify-tag \
+              --repo "$GITHUB_REPOSITORY"
+          fi

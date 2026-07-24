@@ -152,5 +152,33 @@ install, Event Viewer, update, and uninstall instructions.
 
 ## 7. Release pipeline
 
-CI (ticket GC-074) builds the matrix, produces checksummed archives per platform,
-multi-arch container images (ghcr), and the HA add-on image set, on tags.
+Pushing a stable tag in the form `vX.Y.Z` starts the release workflow. The tag
+without its leading `v` must exactly match `version` in
+[`../deploy/addon/config.yaml`](../deploy/addon/config.yaml); the workflow stops
+before publishing if the two differ.
+
+The workflow:
+
+- runs the race-enabled test suite and builds the complete GC-004 binary matrix;
+- creates `.tar.gz` archives for Linux/macOS, a `.zip` archive for Windows, and
+  a `SHA256SUMS` file, then attaches them to a GitHub Release with generated
+  notes;
+- publishes the main image as `vX.Y.Z`, `X.Y.Z`, and `latest`, with a manifest
+  for `linux/amd64`, `linux/arm64`, and `linux/arm/v7`;
+- publishes Home Assistant architecture images named
+  `amd64-gbbconnect-go-addon`, `aarch64-gbbconnect-go-addon`, and
+  `armv7-gbbconnect-go-addon`, then combines them into the preferred generic
+  `gbbconnect-go-addon:X.Y.Z` multi-arch manifest (and `latest`).
+
+The binary version is the full Git tag, for example:
+
+```console
+$ gbbconnect version
+gbbconnect version v0.1.0
+```
+
+Before tagging, update the add-on manifest and changelog to the intended release
+version. After the workflow finishes, verify `SHA256SUMS`, both image manifests,
+and a native binary invocation. Publishing requires the repository's Actions
+token to have package and release write access; the workflow requests only
+those job-scoped permissions.
