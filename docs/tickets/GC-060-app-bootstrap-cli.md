@@ -3,7 +3,7 @@
 - **Epic:** G - Runtime
 - **Type:** Feature
 - **Priority:** High
-- **Status:** TODO
+- **Status:** DONE
 - **Estimate:** 0.5 day
 - **Depends on:** GC-011
 - **Blocks:** GC-052, GC-061

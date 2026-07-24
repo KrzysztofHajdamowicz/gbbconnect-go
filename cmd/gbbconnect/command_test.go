@@ -27,7 +27,6 @@ func TestHelpCommands(t *testing.T) {
 		args []string
 		want string
 	}{
-		{name: "root", args: []string{}, want: "Usage:\n  gbbconnect"},
 		{name: "root explicit", args: []string{"--help"}, want: "Usage:\n  gbbconnect"},
 		{name: "run", args: []string{"run", "--help"}, want: "Usage:\n  gbbconnect run"},
 		{name: "discover", args: []string{"discover", "--help"}, want: "Usage:\n  gbbconnect discover"},

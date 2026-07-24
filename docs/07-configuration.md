@@ -39,7 +39,7 @@ logging:
   level: info               # error | warn | info | debug  (see LogLevel mapping)
   driver_trace: false       # decoded Modbus trace (orig IsDriverLog)
   driver_trace_raw: false   # raw frame hex trace   (orig IsDriverLog2)
-  directory: ""             # daily log files dir (empty = default); used by log streaming
+  directory: ""             # daily log files dir (empty = <state-dir>/logs); used by log streaming
 
 # One entry per plant (inverter site)
 plants:

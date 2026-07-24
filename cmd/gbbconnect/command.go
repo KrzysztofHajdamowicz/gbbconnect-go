@@ -11,28 +11,69 @@ import (
 )
 
 func newRootCommand(buildVersion string) *cobra.Command {
-	return newRootCommandWithDiscovery(buildVersion, defaultDiscoveryDependencies())
+	return newRootCommandWithDependencies(
+		buildVersion,
+		defaultDiscoveryDependencies(),
+		defaultRunDependencies(),
+	)
 }
 
 func newRootCommandWithDiscovery(
 	buildVersion string,
 	discoveryDependencies discoveryDependencies,
 ) *cobra.Command {
+	return newRootCommandWithDependencies(
+		buildVersion,
+		discoveryDependencies,
+		defaultRunDependencies(),
+	)
+}
+
+func newRootCommandWithDependencies(
+	buildVersion string,
+	discoveryDependencies discoveryDependencies,
+	runDependencies runDependencies,
+) *cobra.Command {
+	var options globalOptions
 	root := &cobra.Command{
 		Use:           "gbbconnect",
 		Short:         "MQTT-to-Modbus bridge for GbbOptimizer",
 		SilenceErrors: true,
 		SilenceUsage:  true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return cmd.Help()
+			return runApplication(cmd, buildVersion, &options, runDependencies)
 		},
 	}
+	root.PersistentFlags().StringVar(
+		&options.configPath,
+		"config",
+		"",
+		"path to gbbconnect.yaml or options.json",
+	)
+	root.PersistentFlags().StringVar(
+		&options.stateDir,
+		"state-dir",
+		"",
+		"directory for persistent runtime state",
+	)
+	root.PersistentFlags().StringVar(
+		&options.logLevel,
+		"log-level",
+		"",
+		"override logging level (error, warn, info, debug)",
+	)
+	root.PersistentFlags().BoolVar(
+		&options.dev,
+		"dev",
+		false,
+		"enable development runtime timings and debug behaviour",
+	)
 
 	root.AddCommand(
-		newStubCommand("run", "Run the MQTT-to-Modbus bridge"),
+		newRunCommand(buildVersion, &options, runDependencies),
 		newDiscoverCommand(discoveryDependencies),
 		newImportXMLCommand(),
-		newConfigCommand(),
+		newConfigCommand(&options.configPath),
 		&cobra.Command{
 			Use:   "version",
 			Short: "Print the gbbconnect version",
@@ -47,37 +88,35 @@ func newRootCommandWithDiscovery(
 	return root
 }
 
-func newConfigCommand() *cobra.Command {
+func newConfigCommand(configPath *string) *cobra.Command {
 	command := &cobra.Command{
 		Use:   "config",
 		Short: "Inspect and validate gbbconnect configuration",
 	}
 
-	var configPath string
 	validateCommand := &cobra.Command{
 		Use:   "validate",
 		Short: "Validate a YAML or JSON configuration file",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			if configPath == "" {
+			if configPath == nil || *configPath == "" {
 				return fmt.Errorf("--config is required")
 			}
 
-			loaded, err := config.Load(config.LoadOptions{Path: configPath})
+			loaded, err := config.Load(config.LoadOptions{Path: *configPath})
 			if err != nil {
 				return err
 			}
-			if err := config.ValidateSchemaFile(configPath); err != nil {
+			if err := config.ValidateSchemaFile(*configPath); err != nil {
 				return err
 			}
 			if err := config.ValidateSchema(loaded); err != nil {
 				return err
 			}
-			_, err = fmt.Fprintf(cmd.OutOrStdout(), "Configuration %s is valid\n", configPath)
+			_, err = fmt.Fprintf(cmd.OutOrStdout(), "Configuration %s is valid\n", *configPath)
 			return err
 		},
 	}
-	validateCommand.Flags().StringVar(&configPath, "config", "", "path to gbbconnect.yaml or options.json")
 	command.AddCommand(validateCommand)
 	return command
 }
@@ -134,15 +173,4 @@ func newImportXMLCommand() *cobra.Command {
 	command.Flags().StringVar(&inputPath, "in", "", "path to Parameters.xml")
 	command.Flags().StringVar(&outputPath, "out", "", "path for gbbconnect.yaml")
 	return command
-}
-
-func newStubCommand(use, short string) *cobra.Command {
-	return &cobra.Command{
-		Use:   use,
-		Short: short,
-		Args:  cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			return cmd.Help()
-		},
-	}
 }
