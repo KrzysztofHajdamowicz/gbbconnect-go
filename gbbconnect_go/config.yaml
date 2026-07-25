@@ -1,6 +1,6 @@
 ---
 name: "gbbconnect-go"
-version: "0.1.6"
+version: "0.1.7"
 slug: "gbbconnect_go"
 description: "Unofficial GbbOptimizer MQTT-to-Modbus bridge"
 url: "https://github.com/KrzysztofHajdamowicz/gbbconnect-go"
