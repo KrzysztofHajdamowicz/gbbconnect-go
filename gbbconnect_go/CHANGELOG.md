@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.5
+
+- Fix configuration form translations not being applied: fields nested in
+  sections and lists (`plants`, `sub_inverters`, `runtime`, `logging`) must
+  live under their parent's `fields:` key in the translation files — the
+  0.1.3 files used flat keys, which the Home Assistant frontend never looks
+  up for nested fields. As a bonus, `serial` now has distinct descriptions
+  for plants (Solarman dongle serial) and sub-inverters (inverter serial).
+
 ## 0.1.3
 
 - Add English and Polish translations for the configuration form: every
