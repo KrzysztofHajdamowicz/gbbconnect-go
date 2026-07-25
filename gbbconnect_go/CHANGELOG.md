@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.1.3
+
+- Add English and Polish translations for the configuration form: every
+  option now has a readable label and a description that explains what to
+  enter and which connection methods (`driver` values) actually use it —
+  including the often-confused `serial` (Solarman dongle serial number, not
+  the inverter's) and `serial_device` (RS485 serial port path, e.g.
+  `/dev/ttyUSB0`).
+- Rewrite the "Driver fields" section of the documentation to match the
+  form's flat field names (`serial_device` instead of the native
+  `serial_port.device`) and to state that fields unused by the selected
+  connection method are ignored.
+
 ## 0.1.2
 
 - The add-on package moved from `deploy/addon/` to `gbbconnect_go/` at the
