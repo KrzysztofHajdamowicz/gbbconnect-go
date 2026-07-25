@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.7
+
+- Re-release of the 0.1.6 content, which Home Assistant installations did not
+  pick up. Nothing changed in the add-on itself: see the 0.1.6 entry for the
+  logging fixes this delivers.
+
 ## 0.1.6
 
 - Fix the add-on log going quiet for no visible reason. The GbbOptimizer plant
