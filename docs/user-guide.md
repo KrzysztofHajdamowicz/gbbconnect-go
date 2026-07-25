@@ -511,9 +511,13 @@ Daily files used for cloud log streaming live under the configured
 default.
 
 Start with `--log-level debug` or `GBB_LOGGING_LEVEL=debug`. Enable
-`logging.driver_trace` for decoded Modbus frames and
-`logging.driver_trace_raw` only when raw framing is needed; turn both off after
-the investigation. Cloud values map as follows:
+`logging.driver_trace` for the cloud MQTT payloads (`Received MQTT` and
+`Send MQTT`, matching the portal's own Send/Received entries) together with the
+decoded Modbus frames they carry, and `logging.driver_trace_raw` only when raw
+framing is needed; turn both off after the investigation. The traced `Send
+MQTT` payload reports the size of the streamed `LastLog` chunk instead of its
+text, so the daily log is never written back into itself. Cloud values map as
+follows:
 
 | Cloud `LogLevel` | Effect |
 |---|---|

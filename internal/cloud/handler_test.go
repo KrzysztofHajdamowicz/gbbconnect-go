@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -843,6 +845,134 @@ func mustRequestHandler(
 		t.Fatalf("NewRequestHandler() error = %v", err)
 	}
 	return handler
+}
+
+func TestRequestHandlerTracesMQTTPayloadsWithDriverTrace(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		trace bool
+	}{
+		{name: "enabled", trace: true},
+		{name: "disabled"},
+	}
+
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			var output bytes.Buffer
+			handler, _ := newTracingTestHandler(t, &output, test.trace, nil)
+
+			request := `{"OrderId":"abc","Lines":[{"LineNo":0,"Modbus":"010300000001840A"}]}`
+			if err := handler.Handle(context.Background(), []byte(request)); err != nil {
+				t.Fatalf("Handle() error = %v", err)
+			}
+
+			logged := output.String()
+			gotReceived := strings.Contains(logged, "Received MQTT")
+			gotSent := strings.Contains(logged, "Send MQTT")
+			if gotReceived != test.trace || gotSent != test.trace {
+				t.Fatalf(
+					"received=%t sent=%t, want %t for both\nlog: %s",
+					gotReceived,
+					gotSent,
+					test.trace,
+					logged,
+				)
+			}
+			if !test.trace {
+				return
+			}
+			if !strings.Contains(logged, `OrderId`) {
+				t.Fatalf("traced payload is missing the request body\nlog: %s", logged)
+			}
+		})
+	}
+}
+
+func TestRequestHandlerTraceElidesLastLogText(t *testing.T) {
+	t.Parallel()
+
+	logText := "2026-07-25 20:00:00: a previously written log line"
+	var output bytes.Buffer
+	handler, publisher := newTracingTestHandler(t, &output, true, &LastLogRead{
+		Text: &logText,
+	})
+
+	if err := handler.Handle(
+		context.Background(),
+		[]byte(`{"OrderId":"abc","SendLastLog":1}`),
+	); err != nil {
+		t.Fatalf("Handle() error = %v", err)
+	}
+
+	logged := output.String()
+	if strings.Contains(logged, "a previously written log line") {
+		t.Fatalf("traced payload leaked LastLog text back into the log\nlog: %s", logged)
+	}
+	if !strings.Contains(logged, fmt.Sprintf("[%d bytes]", len(logText))) {
+		t.Fatalf("traced payload is missing the LastLog size marker\nlog: %s", logged)
+	}
+
+	published := publisher.singleMessage(t)
+	if !strings.Contains(string(published.payload), logText) {
+		t.Fatal("published payload lost the real LastLog text")
+	}
+}
+
+func newTracingTestHandler(
+	t *testing.T,
+	output *bytes.Buffer,
+	trace bool,
+	lastLog *LastLogRead,
+) (*RequestHandler, *fakeResponsePublisher) {
+	t.Helper()
+
+	logRuntime, err := logbuf.New(logbuf.Options{
+		Level:  logbuf.LevelInfo,
+		Output: output,
+	})
+	if err != nil {
+		t.Fatalf("logbuf.New() error = %v", err)
+	}
+	logRuntime.SetDriverTrace(trace, false)
+
+	store, err := state.New(t.TempDir())
+	if err != nil {
+		t.Fatalf("state.New() error = %v", err)
+	}
+	controller, err := NewPersistentLogLevelController(logRuntime, store, LogLevelOptions{})
+	if err != nil {
+		t.Fatalf("NewPersistentLogLevelController() error = %v", err)
+	}
+
+	var streamer LastLogStreamer = noopLastLogStreamer{}
+	if lastLog != nil {
+		streamer = &recordingLastLogStreamer{prepared: *lastLog}
+	}
+
+	publisher := &fakeResponsePublisher{}
+	handler, err := NewRequestHandler(
+		testHandlerPlant(),
+		publisher,
+		logRuntime,
+		HandlerOptions{
+			Version:            "1.3.0-go",
+			Environment:        "Test",
+			LogLevelController: controller,
+			LastLogStreamer:    streamer,
+			DriverFactory: func(config.Plant, logbuf.Logger) (driver.Driver, error) {
+				return &fakeHandlerDriver{}, nil
+			},
+		},
+	)
+	if err != nil {
+		t.Fatalf("NewRequestHandler() error = %v", err)
+	}
+	return handler, publisher
 }
 
 func testHandlerPlant() config.Plant {

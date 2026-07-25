@@ -25,6 +25,10 @@ type ResponsePublisher interface {
 // DriverFactory constructs the target driver for one request.
 type DriverFactory func(plant config.Plant, logger logbuf.Logger) (driver.Driver, error)
 
+type traceControls interface {
+	DriverTraceEnabled() bool
+}
+
 // HandlerOptions supplies response metadata and test seams.
 type HandlerOptions struct {
 	Version            string
@@ -44,6 +48,7 @@ type RequestHandler struct {
 	newDriver   DriverFactory
 	logLevel    LogLevelController
 	lastLog     LastLogStreamer
+	trace       traceControls
 	token       chan struct{}
 }
 
@@ -97,6 +102,9 @@ func NewRequestHandler(
 		lastLog:     options.LastLogStreamer,
 		token:       make(chan struct{}, 1),
 	}
+	if controls, ok := logger.(traceControls); ok {
+		handler.trace = controls
+	}
 	handler.token <- struct{}{}
 	return handler, nil
 }
@@ -120,6 +128,8 @@ func (handler *RequestHandler) Handle(ctx context.Context, payload []byte) error
 		return ctx.Err()
 	}
 
+	handler.traceReceived(payload)
+
 	header, err := protocol.Decode(payload)
 	if err != nil {
 		return err
@@ -140,6 +150,7 @@ func (handler *RequestHandler) Handle(ctx context.Context, payload []byte) error
 	if err != nil {
 		return err
 	}
+	handler.traceSent(header, response)
 	if err := handler.publisher.PublishContext(
 		ctx,
 		FromDeviceTopic(handler.plant.Cloud.PlantID),
@@ -154,6 +165,40 @@ func (handler *RequestHandler) Handle(ctx context.Context, payload []byte) error
 		}
 	}
 	return nil
+}
+
+func (handler *RequestHandler) traceEnabled() bool {
+	return handler.trace != nil && handler.trace.DriverTraceEnabled()
+}
+
+func (handler *RequestHandler) traceReceived(payload []byte) {
+	if !handler.traceEnabled() {
+		return
+	}
+	handler.logger.Info("Received MQTT", "payload", string(payload))
+}
+
+func (handler *RequestHandler) traceSent(header *protocol.Header, response []byte) {
+	if !handler.traceEnabled() {
+		return
+	}
+	if header.LastLog == nil {
+		handler.logger.Info("Send MQTT", "payload", string(response))
+		return
+	}
+
+	// LastLog carries a slice of the daily log file. Logging it verbatim would
+	// write the log back into itself and ship the duplicate on the next
+	// SendLastLog request, so trace its size instead of its text.
+	elided := *header
+	placeholder := fmt.Sprintf("[%d bytes]", len(*header.LastLog))
+	elided.LastLog = &placeholder
+	encoded, err := protocol.Encode(&elided)
+	if err != nil {
+		handler.logger.Info("Send MQTT", "last_log_bytes", len(*header.LastLog))
+		return
+	}
+	handler.logger.Info("Send MQTT", "payload", string(encoded))
 }
 
 func (handler *RequestHandler) applyLogLevel(header *protocol.Header) error {
