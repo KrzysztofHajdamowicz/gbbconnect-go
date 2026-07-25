@@ -82,21 +82,51 @@ on the host; it is not required during normal daemon operation.
 
 ## 3. Home Assistant app/add-on quick start
 
-The current repository contains a ready add-on package under `deploy/addon`.
-Install it as a local add-on:
+This repository is a Home Assistant add-on repository: the add-on package
+lives at the repository root in [`gbbconnect_go/`](../gbbconnect_go/), so you
+can install it directly from the add-on store without copying any files.
 
-1. Use the Home Assistant SSH or Samba app to access `/addons`, following the
-   [official local app instructions](https://developers.home-assistant.io/docs/apps/tutorial/).
-2. Copy the contents of `deploy/addon` into
-   `/addons/gbbconnect_go` so that
-   `/addons/gbbconnect_go/config.yaml` exists.
-3. Open the Home Assistant app store (called the add-on store in older
-   releases), open its menu, and select **Check for updates**.
-4. Install **gbbconnect-go** from the local apps/add-ons section.
+### Install from the repository (recommended)
+
+Click the button to open your Home Assistant instance with the repository URL
+pre-filled:
+
+[![Open your Home Assistant instance and show the add add-on repository dialog with a specific repository URL pre-filled.](https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg)](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2FKrzysztofHajdamowicz%2Fgbbconnect-go)
+
+Or add the repository manually:
+
+1. In Home Assistant, open **Settings → Add-ons → Add-on Store**.
+2. Open the store menu (**⋮** in the top-right corner) and select
+   **Repositories**.
+3. Paste `https://github.com/KrzysztofHajdamowicz/gbbconnect-go` and click
+   **Add**, then close the dialog.
+4. Refresh the store page (or select **Check for updates** from the same
+   menu) and install **gbbconnect-go** from the new repository section.
 5. In its **Configuration** tab, edit the default disabled plant:
    select the driver, enter its transport fields, then enter
    `cloud_plant_id`, `cloud_plant_token`, and `cloud_mqtt_address`.
 6. Set `enabled: true`, save, start the add-on, and inspect its **Log** tab.
+
+> **Migrating from a local install:** if you previously copied the add-on to
+> `/addons/gbbconnect_go`, that local copy (`local_gbbconnect_go`) is a
+> different add-on identity from the repository install. Note down your
+> options, uninstall the local add-on, remove `/addons/gbbconnect_go`, and
+> install from the repository; state under `/data` does not carry over.
+
+### Install as a local add-on (fallback)
+
+Without internet access to GitHub from the add-on store, install the package
+as a local add-on instead:
+
+1. Use the Home Assistant SSH or Samba app to access `/addons`, following the
+   [official local app instructions](https://developers.home-assistant.io/docs/apps/tutorial/).
+2. Copy the contents of `gbbconnect_go` into
+   `/addons/gbbconnect_go` so that
+   `/addons/gbbconnect_go/config.yaml` exists.
+3. Open the Home Assistant app store (called the add-on store in older
+   releases), open its menu, and select **Check for updates**.
+4. Install **gbbconnect-go** from the local apps/add-ons section, then
+   configure it as in steps 5–6 above.
 
 The form uses flat field names because of Home Assistant nesting limits:
 
@@ -113,7 +143,7 @@ Sub-inverters are entered in the separate top-level `sub_inverters` list. Its
 state, and logs below `/data`; the add-on exposes available UART devices for
 the serial driver.
 
-See [the add-on documentation](../deploy/addon/DOCS.md) for every form field,
+See [the add-on documentation](../gbbconnect_go/DOCS.md) for every form field,
 serial access, VLAN guidance, and shutdown behaviour.
 
 ## 4. systemd quick start

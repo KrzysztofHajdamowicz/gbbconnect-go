@@ -76,7 +76,9 @@ internal/state/             atomic persistent state
 internal/supervisor/        per-plant workers and graceful lifecycle
 internal/testutil/          embedded golden fixtures and byte assertions
 schema/                     canonical configuration JSON Schema
-deploy/                     container, Home Assistant, systemd, Windows docs
+gbbconnect_go/              Home Assistant add-on package (repo root so the
+                            Supervisor can discover it; name equals the slug)
+deploy/                     container image, systemd, and Windows Service docs
 scripts/                    cross-build, coverage, and release helpers
 docs/                       design, compatibility evidence, and ticket history
 ```
@@ -168,7 +170,7 @@ fields are required, then update:
 - `internal/config/validate.go`;
 - `schema/gbbconnect.schema.json`;
 - JSON Schema/model synchronization tests;
-- `deploy/addon/config.yaml` and `deploy/addon/render.jq` if users can select it
+- `gbbconnect_go/config.yaml` and `gbbconnect_go/render.jq` if users can select it
   in Home Assistant;
 - the configuration and user guides.
 

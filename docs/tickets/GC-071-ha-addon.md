@@ -1,5 +1,10 @@
 # GC-071 - Home Assistant Add-on
 
+*Historical note: the add-on package described below later moved from
+`deploy/addon/` to `gbbconnect_go/` at the repository root so the Home
+Assistant Supervisor can discover it when this repository is added as an
+add-on repository.*
+
 - **Epic:** H - Packaging
 - **Type:** Feature
 - **Priority:** High

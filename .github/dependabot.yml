@@ -23,7 +23,7 @@ updates:
   - package-ecosystem: "docker"
     directories:
       - "/deploy"
-      - "/deploy/addon"
+      - "/gbbconnect_go"
     schedule:
       interval: "weekly"
       day: "monday"

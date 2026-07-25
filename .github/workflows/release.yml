@@ -38,7 +38,7 @@ jobs:
           fi
 
           version=${RELEASE_TAG#v}
-          manifest_version=$(awk -F '"' '/^version: / { print $2; exit }' deploy/addon/config.yaml)
+          manifest_version=$(awk -F '"' '/^version: / { print $2; exit }' gbbconnect_go/config.yaml)
           if [[ "$manifest_version" != "$version" ]]; then
             echo "tag version $version does not match add-on version $manifest_version" >&2
             exit 1
@@ -48,7 +48,7 @@ jobs:
           namespace=ghcr.io/$owner
           main_image=$namespace/gbbconnect-go
           addon_image=$namespace/gbbconnect-go-addon
-          manifest_image=$(awk -F '"' '/^image: / { print $2; exit }' deploy/addon/config.yaml)
+          manifest_image=$(awk -F '"' '/^image: / { print $2; exit }' gbbconnect_go/config.yaml)
           if [[ "$manifest_image" != "$addon_image" ]]; then
             echo "add-on image $manifest_image does not match release image $addon_image" >&2
             exit 1
@@ -173,8 +173,8 @@ jobs:
       - name: Build and push architecture image
         uses: docker/build-push-action@v7
         with:
-          context: deploy/addon
-          file: deploy/addon/Dockerfile
+          context: gbbconnect_go
+          file: gbbconnect_go/Dockerfile
           platforms: ${{ matrix.platform }}
           push: true
           provenance: false

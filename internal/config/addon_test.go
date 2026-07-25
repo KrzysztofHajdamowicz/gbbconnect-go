@@ -13,7 +13,7 @@ import (
 func TestHomeAssistantAddonOptionsMatchConfigurationSchema(t *testing.T) {
 	t.Parallel()
 
-	data, err := os.ReadFile("../../deploy/addon/config.yaml")
+	data, err := os.ReadFile("../../gbbconnect_go/config.yaml")
 	if err != nil {
 		t.Fatalf("read add-on config: %v", err)
 	}

@@ -56,10 +56,13 @@ Notes:
 
 ## 3. Home Assistant Add-on
 
-HA add-ons are Docker images plus metadata. Structure (ticket GC-071):
+HA add-ons are Docker images plus metadata. The package lives at the
+repository root as `gbbconnect_go/` — the Supervisor only discovers add-ons in
+top-level directories, and the directory name must equal the add-on slug.
+Structure (ticket GC-071):
 
 ```
-addon/
+gbbconnect_go/
   config.yaml          # add-on manifest + options schema
   Dockerfile           # pinned HA base image selected per architecture
   run.sh / render.jq   # render canonical config from UI options, exec binary
@@ -154,7 +157,7 @@ install, Event Viewer, update, and uninstall instructions.
 
 Pushing a stable tag in the form `vX.Y.Z` starts the release workflow. The tag
 without its leading `v` must exactly match `version` in
-[`../deploy/addon/config.yaml`](../deploy/addon/config.yaml); the workflow stops
+[`../gbbconnect_go/config.yaml`](../gbbconnect_go/config.yaml); the workflow stops
 before publishing if the two differ.
 
 The workflow:
