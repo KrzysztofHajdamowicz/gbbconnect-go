@@ -1,0 +1,165 @@
+# Field labels and descriptions for the Home Assistant configuration form.
+# Nested fields (inside plants[] and sub_inverters[]) are looked up by their
+# leaf key, so keys shared between the two lists carry a description that
+# covers both contexts.
+configuration:
+  version:
+    name: Configuration format version
+    description: >-
+      Internal configuration format version. Leave at 1 — do not change.
+  runtime:
+    name: Runtime
+    description: >-
+      General daemon behaviour (debug mode, log cleanup, environment label).
+  debug:
+    name: Debug mode
+    description: >-
+      Enables verbose daemon diagnostics. Leave off for normal operation.
+  clear_old_logs:
+    name: Clear old logs
+    description: >-
+      Automatically deletes old daily log files to save disk space.
+  gbb_environment:
+    name: GbbOptimizer environment label
+    description: >-
+      Environment name reported to the GbbOptimizer cloud. Leave at
+      "HomeAssistant" unless instructed otherwise.
+  logging:
+    name: Logging
+    description: >-
+      Log verbosity and storage settings.
+  level:
+    name: Log level
+    description: >-
+      How much detail is written to the log. Use "info" normally; "debug"
+      only while troubleshooting.
+  driver_trace:
+    name: Driver trace
+    description: >-
+      Logs every request and response exchanged with the inverter. Very
+      verbose — enable only while troubleshooting.
+  driver_trace_raw:
+    name: Driver raw trace
+    description: >-
+      Additionally logs raw wire bytes for each inverter exchange. Very
+      verbose — enable only while troubleshooting.
+  directory:
+    name: Log directory
+    description: >-
+      Directory for daily log files. Keep the default "/data/logs" so logs
+      survive restarts.
+  plants:
+    name: Plants
+    description: >-
+      Inverter installations. Each entry connects one inverter (plant) to
+      the GbbOptimizer cloud. Fields not used by the selected connection
+      method are ignored — the form cannot hide them.
+  number:
+    name: Plant number
+    description: >-
+      Unique number of this plant within the configuration. Sub-inverter
+      entries reference their parent plant by this number.
+  name:
+    name: Plant name
+    description: >-
+      Human-readable name used in logs.
+  enabled:
+    name: Enabled
+    description: >-
+      Turn the plant on. An enabled plant also requires the GbbOptimizer
+      plant ID and plant token.
+  driver:
+    name: Connection method
+    description: >-
+      How the inverter is reached.
+      "solarman_v5" — through a Solarman Wi-Fi dongle; needs the dongle IP
+      address, port (usually 8899) and the dongle serial number.
+      "modbus_tcp" — Modbus TCP; needs IP address and port (usually 502).
+      "modbus_rtu_tcp" — Modbus RTU over TCP, for transparent RS485-to-Ethernet
+      gateways; needs IP address and port.
+      "modbus_serial" — Modbus over a serial port (requires an RS485 adapter);
+      uses the serial port fields below instead of IP address and port.
+      "random" — diagnostics only, returns no data; do not use.
+  address:
+    name: IP address
+    description: >-
+      IP address (or hostname) of the Solarman Wi-Fi dongle, the inverter's
+      Modbus TCP interface, or the RS485-to-Ethernet gateway. Not used with
+      "modbus_serial" — leave empty then. For sub-inverters: the IP address
+      of that sub-inverter's dongle.
+  port:
+    name: TCP port
+    description: >-
+      TCP port of the device above. Solarman Wi-Fi dongles usually listen on
+      8899, Modbus TCP devices usually on 502. Not used with "modbus_serial".
+  serial:
+    name: Dongle (logger) serial number
+    description: >-
+      For plants: the serial number printed on the Solarman Wi-Fi dongle
+      (e.g. 17xxxxxxx), entered as a plain number. This is NOT the
+      inverter's serial number. Used only with "solarman_v5" — leave 0 for
+      other connection methods. You can find it with "gbbconnect discover".
+      For sub-inverters: the sub-inverter's own serial number instead.
+  serial_device:
+    name: Serial port device path
+    description: >-
+      Path to the RS485 serial device, for example "/dev/ttyUSB0" or a
+      stable "/dev/serial/by-id/..." path. Used only with "modbus_serial" —
+      leave empty for other connection methods.
+  serial_baud:
+    name: Serial baud rate
+    description: >-
+      Serial line speed, for example 9600. Used only with "modbus_serial".
+  serial_data_bits:
+    name: Serial data bits
+    description: >-
+      Number of data bits per character, usually 8. Used only with
+      "modbus_serial".
+  serial_parity:
+    name: Serial parity
+    description: >-
+      Parity of the serial line, usually "none". Used only with
+      "modbus_serial".
+  serial_stop_bits:
+    name: Serial stop bits
+    description: >-
+      Number of stop bits, usually 1. Used only with "modbus_serial".
+  cloud_plant_id:
+    name: GbbOptimizer plant ID
+    description: >-
+      Plant identifier from your account at gbboptimizer.gbbsoft.pl.
+      Required for an enabled plant.
+  cloud_plant_token:
+    name: GbbOptimizer plant token
+    description: >-
+      Secret plant token from your account at gbboptimizer.gbbsoft.pl.
+      Required for an enabled plant.
+  cloud_mqtt_address:
+    name: GbbOptimizer MQTT server
+    description: >-
+      Hostname of the GbbOptimizer MQTT broker. Keep the default unless
+      GbbOptimizer tells you otherwise.
+  cloud_mqtt_port:
+    name: GbbOptimizer MQTT port
+    description: >-
+      TCP port of the GbbOptimizer MQTT broker, normally 8883 (TLS).
+  cloud_tls_insecure_skip_verify:
+    name: Skip TLS certificate verification
+    description: >-
+      Disables TLS certificate verification for the cloud connection.
+      Insecure — use only temporarily for troubleshooting.
+  sub_inverters:
+    name: Sub-inverters
+    description: >-
+      Additional inverters reported under a parent plant. Leave empty for a
+      single-inverter installation.
+  plant_number:
+    name: Parent plant number
+    description: >-
+      Number of the plant this sub-inverter belongs to (matches "Plant
+      number" above).
+  dongle_serial:
+    name: Sub-inverter dongle serial number
+    description: >-
+      Serial number of the Solarman Wi-Fi dongle attached to this
+      sub-inverter (not the inverter's own serial number).

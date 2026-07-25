@@ -1,0 +1,169 @@
+# Etykiety i opisy pól formularza konfiguracji w Home Assistant.
+# Pola zagnieżdżone (w plants[] i sub_inverters[]) są wyszukiwane po nazwie
+# liścia, więc klucze wspólne dla obu list mają opis obejmujący oba konteksty.
+configuration:
+  version:
+    name: Wersja formatu konfiguracji
+    description: >-
+      Wewnętrzna wersja formatu konfiguracji. Pozostaw 1 — nie zmieniaj.
+  runtime:
+    name: Środowisko uruchomieniowe
+    description: >-
+      Ogólne zachowanie usługi (tryb debug, czyszczenie logów, etykieta
+      środowiska).
+  debug:
+    name: Tryb debug
+    description: >-
+      Włącza szczegółową diagnostykę usługi. Przy normalnej pracy pozostaw
+      wyłączone.
+  clear_old_logs:
+    name: Usuwaj stare logi
+    description: >-
+      Automatycznie usuwa stare dzienne pliki logów, oszczędzając miejsce na
+      dysku.
+  gbb_environment:
+    name: Etykieta środowiska GbbOptimizer
+    description: >-
+      Nazwa środowiska raportowana do chmury GbbOptimizer. Pozostaw
+      "HomeAssistant", chyba że polecono inaczej.
+  logging:
+    name: Logowanie
+    description: >-
+      Szczegółowość i miejsce zapisu logów.
+  level:
+    name: Poziom logowania
+    description: >-
+      Ilość szczegółów zapisywanych w logu. Normalnie "info"; "debug" tylko
+      podczas diagnozowania problemów.
+  driver_trace:
+    name: Śledzenie komunikacji z falownikiem
+    description: >-
+      Loguje każde zapytanie i odpowiedź wymienioną z falownikiem. Bardzo
+      obszerne — włączaj tylko podczas diagnozowania problemów.
+  driver_trace_raw:
+    name: Śledzenie surowych bajtów
+    description: >-
+      Dodatkowo loguje surowe bajty każdej wymiany z falownikiem. Bardzo
+      obszerne — włączaj tylko podczas diagnozowania problemów.
+  directory:
+    name: Katalog logów
+    description: >-
+      Katalog na dzienne pliki logów. Pozostaw domyślne "/data/logs", aby
+      logi przetrwały restarty.
+  plants:
+    name: Instalacje (plants)
+    description: >-
+      Instalacje falowników. Każdy wpis łączy jeden falownik (plant) z
+      chmurą GbbOptimizer. Pola nieużywane przez wybraną metodę połączenia
+      są ignorowane — formularz nie potrafi ich ukryć.
+  number:
+    name: Numer instalacji
+    description: >-
+      Unikalny numer tej instalacji w konfiguracji. Wpisy sub-falowników
+      wskazują instalację nadrzędną po tym numerze.
+  name:
+    name: Nazwa instalacji
+    description: >-
+      Czytelna nazwa używana w logach.
+  enabled:
+    name: Włączona
+    description: >-
+      Włącza instalację. Włączona instalacja wymaga też identyfikatora i
+      tokenu z GbbOptimizer.
+  driver:
+    name: Metoda połączenia
+    description: >-
+      Sposób komunikacji z falownikiem.
+      "solarman_v5" — przez dongle Wi-Fi Solarman; wymaga adresu IP dongla,
+      portu (zwykle 8899) i numeru seryjnego dongla.
+      "modbus_tcp" — Modbus TCP; wymaga adresu IP i portu (zwykle 502).
+      "modbus_rtu_tcp" — Modbus RTU over TCP, dla transparentnych bramek
+      RS485-Ethernet; wymaga adresu IP i portu.
+      "modbus_serial" — Modbus przez port szeregowy (wymaga adaptera RS485);
+      używa pól portu szeregowego poniżej zamiast adresu IP i portu.
+      "random" — wyłącznie diagnostyczny, nie zwraca danych; nie używać.
+  address:
+    name: Adres IP
+    description: >-
+      Adres IP (lub nazwa hosta) dongla Wi-Fi Solarman, interfejsu Modbus
+      TCP falownika albo bramki RS485-Ethernet. Nieużywany przy
+      "modbus_serial" — wtedy pozostaw puste. Dla sub-falowników: adres IP
+      dongla danego sub-falownika.
+  port:
+    name: Port TCP
+    description: >-
+      Port TCP powyższego urządzenia. Dongle Solarman zwykle nasłuchują na
+      8899, urządzenia Modbus TCP zwykle na 502. Nieużywany przy
+      "modbus_serial".
+  serial:
+    name: Numer seryjny dongla (loggera)
+    description: >-
+      Dla instalacji: numer seryjny wydrukowany na donglu Wi-Fi Solarman
+      (np. 17xxxxxxx), wpisany jako liczba. To NIE jest numer seryjny
+      falownika. Używany tylko przy "solarman_v5" — przy innych metodach
+      pozostaw 0. Można go znaleźć poleceniem "gbbconnect discover".
+      Dla sub-falowników: numer seryjny samego sub-falownika.
+  serial_device:
+    name: Ścieżka portu szeregowego
+    description: >-
+      Ścieżka urządzenia szeregowego RS485, np. "/dev/ttyUSB0" albo stabilna
+      ścieżka "/dev/serial/by-id/...". Używana tylko przy "modbus_serial" —
+      przy innych metodach pozostaw puste.
+  serial_baud:
+    name: Prędkość portu szeregowego (baud)
+    description: >-
+      Prędkość linii szeregowej, np. 9600. Używana tylko przy
+      "modbus_serial".
+  serial_data_bits:
+    name: Bity danych
+    description: >-
+      Liczba bitów danych na znak, zwykle 8. Używana tylko przy
+      "modbus_serial".
+  serial_parity:
+    name: Parzystość
+    description: >-
+      Parzystość linii szeregowej, zwykle "none". Używana tylko przy
+      "modbus_serial".
+  serial_stop_bits:
+    name: Bity stopu
+    description: >-
+      Liczba bitów stopu, zwykle 1. Używana tylko przy "modbus_serial".
+  cloud_plant_id:
+    name: Identyfikator instalacji GbbOptimizer
+    description: >-
+      Identyfikator instalacji z konta na gbboptimizer.gbbsoft.pl. Wymagany
+      dla włączonej instalacji.
+  cloud_plant_token:
+    name: Token instalacji GbbOptimizer
+    description: >-
+      Sekretny token instalacji z konta na gbboptimizer.gbbsoft.pl.
+      Wymagany dla włączonej instalacji.
+  cloud_mqtt_address:
+    name: Serwer MQTT GbbOptimizer
+    description: >-
+      Nazwa hosta brokera MQTT GbbOptimizer. Pozostaw domyślną, chyba że
+      GbbOptimizer zaleci inaczej.
+  cloud_mqtt_port:
+    name: Port MQTT GbbOptimizer
+    description: >-
+      Port TCP brokera MQTT GbbOptimizer, normalnie 8883 (TLS).
+  cloud_tls_insecure_skip_verify:
+    name: Pomiń weryfikację certyfikatu TLS
+    description: >-
+      Wyłącza weryfikację certyfikatu TLS połączenia z chmurą.
+      Niebezpieczne — używaj tylko tymczasowo do diagnozowania problemów.
+  sub_inverters:
+    name: Sub-falowniki
+    description: >-
+      Dodatkowe falowniki raportowane pod instalacją nadrzędną. Przy
+      instalacji z jednym falownikiem pozostaw puste.
+  plant_number:
+    name: Numer instalacji nadrzędnej
+    description: >-
+      Numer instalacji, do której należy ten sub-falownik (zgodny z polem
+      "Numer instalacji" powyżej).
+  dongle_serial:
+    name: Numer seryjny dongla sub-falownika
+    description: >-
+      Numer seryjny dongla Wi-Fi Solarman podłączonego do tego
+      sub-falownika (nie numer seryjny samego falownika).

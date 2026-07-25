@@ -17,15 +17,28 @@ configuration in private, container-only `/tmp`.
 The default plant is disabled so a fresh installation starts safely before
 credentials and an inverter transport are configured.
 
-## Driver fields
+## Connection methods and their fields
 
-- `solarman_v5`: set `address`, `port` (normally `8899`), and the logger
-  `serial`.
-- `modbus_tcp` or `modbus_rtu_tcp`: set `address` and `port`.
-- `modbus_serial`: set `serial_port.device` (for example `/dev/ttyUSB0`) and
-  line parameters. The add-on declares `uart: true`, so Home Assistant maps
-  available serial devices into the container.
-- `random`: diagnostic driver only; do not use it for a production plant.
+The `driver` field selects how the inverter is reached. The form shows every
+field regardless of the selected method (the Home Assistant UI cannot hide
+fields conditionally); fields not used by the selected method are ignored —
+leave them at their defaults.
+
+- `solarman_v5` — through a Solarman Wi-Fi dongle: set `address` (the
+  dongle's IP), `port` (normally `8899`), and `serial` (the serial number
+  printed on the dongle, e.g. `17xxxxxxx` — **not** the inverter's serial;
+  `gbbconnect discover` can find both the IP and the serial).
+- `modbus_tcp` — Modbus TCP: set `address` and `port` (usually `502`).
+- `modbus_rtu_tcp` — Modbus RTU over TCP, for transparent RS485-to-Ethernet
+  gateways: set `address` and `port`.
+- `modbus_serial` — Modbus over a serial port (requires an RS485 adapter):
+  set `serial_device` (for example `/dev/ttyUSB0` or a stable
+  `/dev/serial/by-id/...` path) and the `serial_baud`, `serial_data_bits`,
+  `serial_parity`, and `serial_stop_bits` line parameters. The add-on
+  declares `uart: true`, so Home Assistant maps available serial devices
+  into the container.
+- `random` — diagnostics only; it returns no data. Do not use it for a
+  production plant.
 
 Each enabled plant also requires `cloud.plant_id`, `cloud.plant_token`, and
 `cloud.mqtt_address`; these appear in the add-on form as `cloud_plant_id`,
