@@ -110,6 +110,7 @@ func newSupervisor(
 	logLevel, err := cloud.NewPersistentLogLevelController(
 		options.Logger,
 		store,
+		cloud.LogLevelOptions{IgnoreRemote: configuration.Runtime.Debug},
 	)
 	if err != nil {
 		return nil, err

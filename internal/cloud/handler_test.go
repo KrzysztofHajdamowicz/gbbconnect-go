@@ -579,7 +579,7 @@ func TestRequestHandlerAppliesRemoteLogLevelBeforeDriverWork(t *testing.T) {
 	if err != nil {
 		t.Fatalf("state.New() error = %v", err)
 	}
-	controller, err := NewPersistentLogLevelController(logRuntime, store)
+	controller, err := NewPersistentLogLevelController(logRuntime, store, LogLevelOptions{})
 	if err != nil {
 		t.Fatalf("NewPersistentLogLevelController() error = %v", err)
 	}
@@ -638,7 +638,7 @@ func TestRequestHandlerWarnsAndIgnoresUnknownRemoteLogLevel(t *testing.T) {
 	if err != nil {
 		t.Fatalf("state.New() error = %v", err)
 	}
-	controller, err := NewPersistentLogLevelController(logRuntime, store)
+	controller, err := NewPersistentLogLevelController(logRuntime, store, LogLevelOptions{})
 	if err != nil {
 		t.Fatalf("NewPersistentLogLevelController() error = %v", err)
 	}

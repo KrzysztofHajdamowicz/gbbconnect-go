@@ -42,7 +42,7 @@ func TestPersistentLogLevelControllerMappingAndRestart(t *testing.T) {
 				t.Fatalf("state.New() error = %v", err)
 			}
 			firstRuntime := newDiscardRuntime(t, logbuf.LevelDebug)
-			controller, err := NewPersistentLogLevelController(firstRuntime, store)
+			controller, err := NewPersistentLogLevelController(firstRuntime, store, LogLevelOptions{})
 			if err != nil {
 				t.Fatalf("NewPersistentLogLevelController() error = %v", err)
 			}
@@ -66,7 +66,7 @@ func TestPersistentLogLevelControllerMappingAndRestart(t *testing.T) {
 
 			restartedRuntime := newDiscardRuntime(t, logbuf.LevelDebug)
 			restartedRuntime.SetDriverTrace(!test.decodedTrace, !test.rawTrace)
-			if _, err := NewPersistentLogLevelController(restartedRuntime, store); err != nil {
+			if _, err := NewPersistentLogLevelController(restartedRuntime, store, LogLevelOptions{}); err != nil {
 				t.Fatalf("restart NewPersistentLogLevelController() error = %v", err)
 			}
 			assertRuntimeControls(
@@ -89,7 +89,7 @@ func TestPersistentLogLevelControllerRejectsUnknownWithoutChanges(t *testing.T) 
 	}
 	logRuntime := newDiscardRuntime(t, logbuf.LevelDebug)
 	logRuntime.SetDriverTrace(true, false)
-	controller, err := NewPersistentLogLevelController(logRuntime, store)
+	controller, err := NewPersistentLogLevelController(logRuntime, store, LogLevelOptions{})
 	if err != nil {
 		t.Fatalf("NewPersistentLogLevelController() error = %v", err)
 	}
@@ -117,10 +117,10 @@ func TestPersistentLogLevelControllerValidationAndInvalidRestore(t *testing.T) {
 	if err != nil {
 		t.Fatalf("state.New() error = %v", err)
 	}
-	if _, err := NewPersistentLogLevelController(nil, store); err == nil {
+	if _, err := NewPersistentLogLevelController(nil, store, LogLevelOptions{}); err == nil {
 		t.Fatal("NewPersistentLogLevelController(nil runtime) error = nil")
 	}
-	if _, err := NewPersistentLogLevelController(logRuntime, nil); err == nil {
+	if _, err := NewPersistentLogLevelController(logRuntime, nil, LogLevelOptions{}); err == nil {
 		t.Fatal("NewPersistentLogLevelController(nil store) error = nil")
 	}
 
@@ -136,12 +136,74 @@ func TestPersistentLogLevelControllerValidationAndInvalidRestore(t *testing.T) {
 	if err != nil {
 		t.Fatalf("state.New(invalid directory) error = %v", err)
 	}
-	if _, err := NewPersistentLogLevelController(logRuntime, invalidStore); !errors.Is(
+	if _, err := NewPersistentLogLevelController(logRuntime, invalidStore, LogLevelOptions{}); !errors.Is(
 		err,
 		logbuf.ErrUnknownCloudLevel,
 	) {
 		t.Fatalf("invalid restore error = %v", err)
 	}
+}
+
+func TestPersistentLogLevelControllerIgnoreRemote(t *testing.T) {
+	t.Parallel()
+
+	store, err := state.New(t.TempDir())
+	if err != nil {
+		t.Fatalf("state.New() error = %v", err)
+	}
+	logRuntime := newDiscardRuntime(t, logbuf.LevelDebug)
+	logRuntime.SetDriverTrace(true, true)
+	controller, err := NewPersistentLogLevelController(
+		logRuntime,
+		store,
+		LogLevelOptions{IgnoreRemote: true},
+	)
+	if err != nil {
+		t.Fatalf("NewPersistentLogLevelController() error = %v", err)
+	}
+
+	if err := controller.ApplyCloudLevel("OnlyErrors"); err != nil {
+		t.Fatalf("ApplyCloudLevel(OnlyErrors) error = %v", err)
+	}
+	assertRuntimeControls(t, logRuntime, logbuf.LevelDebug, true, true)
+
+	persisted, err := store.LoadRuntime()
+	if err != nil {
+		t.Fatalf("LoadRuntime() error = %v", err)
+	}
+	if persisted != (state.RuntimeState{}) {
+		t.Fatalf("persisted state = %#v, want zero value", persisted)
+	}
+
+	if err := controller.ApplyCloudLevel("unknown"); !errors.Is(
+		err,
+		logbuf.ErrUnknownCloudLevel,
+	) {
+		t.Fatalf("ApplyCloudLevel(unknown) error = %v", err)
+	}
+}
+
+func TestPersistentLogLevelControllerIgnoreRemoteSkipsPersistedRestore(t *testing.T) {
+	t.Parallel()
+
+	store, err := state.New(t.TempDir())
+	if err != nil {
+		t.Fatalf("state.New() error = %v", err)
+	}
+	if err := store.SaveRuntime(state.RuntimeState{LogLevel: "OnlyErrors"}); err != nil {
+		t.Fatalf("SaveRuntime() error = %v", err)
+	}
+
+	logRuntime := newDiscardRuntime(t, logbuf.LevelDebug)
+	logRuntime.SetDriverTrace(true, true)
+	if _, err := NewPersistentLogLevelController(
+		logRuntime,
+		store,
+		LogLevelOptions{IgnoreRemote: true},
+	); err != nil {
+		t.Fatalf("NewPersistentLogLevelController() error = %v", err)
+	}
+	assertRuntimeControls(t, logRuntime, logbuf.LevelDebug, true, true)
 }
 
 func newDiscardRuntime(t *testing.T, level logbuf.Level) *logbuf.Runtime {

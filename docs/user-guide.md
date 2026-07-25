@@ -521,9 +521,18 @@ the investigation. Cloud values map as follows:
 | `Min` | Informational logging, driver traces off |
 | `Max` | Informational logging, decoded and raw driver traces on |
 
-A valid remote cloud level is persisted in `runtime.json` under the state
-directory. If logging unexpectedly returns after restart, inspect that state
-file as well as the YAML and command-line override.
+The GbbOptimizer portal sends its plant setting *"Remotly change log level on
+GbbConnect2"* in every request, so a portal value of `OnlyErrors` silences
+informational logs and driver traces regardless of the local configuration.
+Each change is announced with a `logging level overridden by remote side`
+message before it takes effect. A valid remote cloud level is persisted in
+`runtime.json` under the state directory and re-applied on start. If logging
+unexpectedly quiets down or returns after restart, inspect that state file, the
+portal setting, the YAML, and the command-line override.
+
+`runtime.debug: true` (or `--dev`) pins logging to the local configuration:
+remote `LogLevel` values are acknowledged but ignored, and the persisted
+override in `runtime.json` is not restored.
 
 ### State or log permission errors
 
