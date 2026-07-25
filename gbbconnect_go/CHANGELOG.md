@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.1.6
+
+- Fix the add-on log going quiet for no visible reason. The GbbOptimizer plant
+  setting *"Remotly change log level on GbbConnect2"* is sent with every cloud
+  request, so a portal value of `Only errors` silenced the log and the driver
+  traces without leaving a trace of its own — the add-on looked hung while it
+  was in fact polling the inverter normally. Every remote change is now
+  reported as `logging level overridden by remote side` before it takes
+  effect, including the value restored from `/data/state/runtime.json` on
+  start.
+- `debug` now pins logging to the add-on options: remote log levels are
+  reported but ignored, and the persisted override is not restored, so a
+  debugging session can no longer be silenced from the portal.
+- `driver_trace` now also logs the cloud MQTT payloads as `Received MQTT` and
+  `Send MQTT`, mirroring the Send/Received entries in the portal's own log
+  view, so a request can be followed end to end with one option. The traced
+  outgoing payload reports the size of the streamed log chunk instead of its
+  text, which keeps the daily log from being written back into itself.
+
 ## 0.1.5
 
 - Fix configuration form translations not being applied: fields nested in
