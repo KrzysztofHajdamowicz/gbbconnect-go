@@ -89,6 +89,7 @@ type Cloud struct {
 	PlantToken            string `yaml:"plant_token" json:"plant_token"`
 	MQTTAddress           string `yaml:"mqtt_address" json:"mqtt_address"`
 	MQTTPort              int    `yaml:"mqtt_port" json:"mqtt_port"`
+	UseTLS                bool   `yaml:"use_tls" json:"use_tls"`
 	TLSInsecureSkipVerify bool   `yaml:"tls_insecure_skip_verify" json:"tls_insecure_skip_verify"`
 }
 
@@ -139,6 +140,7 @@ func DefaultCloud() Cloud {
 	return Cloud{
 		MQTTAddress: "gbboptimizerX-mqtt.gbbsoft.pl",
 		MQTTPort:    DefaultMQTTPort,
+		UseTLS:      true,
 	}
 }
 

@@ -39,6 +39,7 @@ plants:
       plant_token: "your-token-here"
       mqtt_address: "gbboptimizer1-mqtt.gbbsoft.pl"
       mqtt_port: 8883
+      use_tls: true
       tls_insecure_skip_verify: false
     sub_inverters:
       - serial: 123
@@ -146,6 +147,9 @@ func TestDefaultsForOmittedFields(t *testing.T) {
 	if plant.Cloud.MQTTPort != DefaultMQTTPort {
 		t.Errorf("Cloud.MQTTPort = %d, want %d", plant.Cloud.MQTTPort, DefaultMQTTPort)
 	}
+	if !plant.Cloud.UseTLS {
+		t.Error("Cloud.UseTLS = false, want default true")
+	}
 	if plant.SerialPort.Baud != DefaultBaud ||
 		plant.SerialPort.DataBits != 8 ||
 		plant.SerialPort.Parity != ParityNone ||
@@ -173,6 +177,18 @@ plants:
 	if config.Plants[0].Enabled {
 		t.Error("Plant.Enabled = true, want explicit false")
 	}
+
+	const plaintextInput = `plants:
+  - cloud:
+      use_tls: false
+`
+	var plaintext Config
+	if err := yaml.Unmarshal([]byte(plaintextInput), &plaintext); err != nil {
+		t.Fatalf("yaml.Unmarshal() error = %v", err)
+	}
+	if plaintext.Plants[0].Cloud.UseTLS {
+		t.Error("Cloud.UseTLS = true, want explicit false")
+	}
 }
 
 func TestJSONDefaults(t *testing.T) {
@@ -188,7 +204,7 @@ func TestJSONDefaults(t *testing.T) {
 	if !config.Runtime.ClearOldLogs || config.Logging.Level != LogLevelInfo {
 		t.Fatalf("global defaults were not applied: %#v", config.Redacted())
 	}
-	if !plant.Enabled || plant.Port != DefaultPort || plant.Cloud.MQTTPort != DefaultMQTTPort {
+	if !plant.Enabled || plant.Port != DefaultPort || plant.Cloud.MQTTPort != DefaultMQTTPort || !plant.Cloud.UseTLS {
 		t.Fatalf("plant defaults were not applied: %#v", config.Redacted().Plants[0])
 	}
 }
@@ -315,6 +331,7 @@ func assertFullConfig(t *testing.T, config Config) {
 		plant.Cloud.PlantToken != "your-token-here" ||
 		plant.Cloud.MQTTAddress != "gbboptimizer1-mqtt.gbbsoft.pl" ||
 		plant.Cloud.MQTTPort != 8883 ||
+		!plant.Cloud.UseTLS ||
 		plant.Cloud.TLSInsecureSkipVerify {
 		t.Errorf("unexpected cloud config: %#v", config.Redacted().Plants[0].Cloud)
 	}

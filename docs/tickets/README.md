@@ -65,6 +65,7 @@ test notes so an implementer (human or AI agent) can pick it up independently.
 - [GC-044](GC-044-loglevel-control.md) - Remote LogLevel control
 - [GC-045](GC-045-log-streaming.md) - Incremental log streaming
 - [GC-046](GC-046-subinverter-routing.md) - Sub-inverter routing
+- [GC-047](GC-047-plaintext-mqtt.md) - Plaintext MQTT cloud connections
 
 ### EPIC-F - Discovery
 - [GC-050](GC-050-udp-discovery.md) - UDP Solarman discovery
@@ -177,6 +178,7 @@ it to `IN PROGRESS` / `DONE` (or track in your issue tracker if importing).
 | GC-044 | E | Medium | DONE |
 | GC-045 | E | Low | DONE |
 | GC-046 | E | Medium | DONE |
+| GC-047 | E | Medium | DONE |
 | GC-050 | F | Medium | DONE |
 | GC-051 | F | Low | DONE |
 | GC-052 | F | Medium | DONE |

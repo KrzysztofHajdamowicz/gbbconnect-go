@@ -144,6 +144,77 @@ func TestNewClientInsecureTLSWarnsWithoutLeakingToken(t *testing.T) {
 	}
 }
 
+func TestNewClientPlaintextDialsTCPWithoutTLS(t *testing.T) {
+	t.Parallel()
+
+	var output bytes.Buffer
+	runtime, err := logbuf.New(logbuf.Options{Output: &output})
+	if err != nil {
+		t.Fatalf("logbuf.New() error = %v", err)
+	}
+	defer func() {
+		if closeErr := runtime.Close(); closeErr != nil {
+			t.Errorf("logger close error = %v", closeErr)
+		}
+	}()
+
+	cloud := testCloud()
+	cloud.UseTLS = false
+	backend := newFakeBackend()
+	_, err = newClient(cloud, runtime, backend.factory)
+	if err != nil {
+		t.Fatalf("newClient() error = %v", err)
+	}
+
+	reader := mqtt.NewOptionsReader(backend.options)
+	servers := reader.Servers()
+	if len(servers) != 1 || servers[0].String() != "tcp://mqtt.example.test:8883" {
+		t.Fatalf("Servers = %v, want [tcp://mqtt.example.test:8883]", servers)
+	}
+	if tlsConfig := reader.TLSConfig(); tlsConfig != nil {
+		t.Errorf("TLSConfig = %+v, want nil for plaintext", tlsConfig)
+	}
+	logged := output.String()
+	if !bytes.Contains([]byte(logged), []byte("TLS is disabled")) {
+		t.Errorf("plaintext warning missing: %q", logged)
+	}
+	if bytes.Contains([]byte(logged), []byte(testPlantToken)) {
+		t.Errorf("logs contain plant token: %q", logged)
+	}
+}
+
+func TestNewClientPlaintextIgnoresInsecureSkipVerify(t *testing.T) {
+	t.Parallel()
+
+	var output bytes.Buffer
+	runtime, err := logbuf.New(logbuf.Options{Output: &output})
+	if err != nil {
+		t.Fatalf("logbuf.New() error = %v", err)
+	}
+	defer func() {
+		if closeErr := runtime.Close(); closeErr != nil {
+			t.Errorf("logger close error = %v", closeErr)
+		}
+	}()
+
+	cloud := testCloud()
+	cloud.UseTLS = false
+	cloud.TLSInsecureSkipVerify = true
+	backend := newFakeBackend()
+	_, err = newClient(cloud, runtime, backend.factory)
+	if err != nil {
+		t.Fatalf("newClient() error = %v", err)
+	}
+
+	logged := output.String()
+	if !bytes.Contains([]byte(logged), []byte("has no effect")) {
+		t.Errorf("no-effect warning missing: %q", logged)
+	}
+	if bytes.Contains([]byte(logged), []byte("certificate verification is disabled")) {
+		t.Errorf("plaintext client logged TLS verification warning: %q", logged)
+	}
+}
+
 func TestNewClientValidation(t *testing.T) {
 	t.Parallel()
 
@@ -404,6 +475,7 @@ func testCloud() config.Cloud {
 		PlantToken:  testPlantToken,
 		MQTTAddress: "mqtt.example.test",
 		MQTTPort:    8883,
+		UseTLS:      true,
 	}
 }
 

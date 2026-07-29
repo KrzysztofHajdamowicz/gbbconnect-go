@@ -27,6 +27,7 @@
             plant_token: .cloud_plant_token,
             mqtt_address: .cloud_mqtt_address,
             mqtt_port: .cloud_mqtt_port,
+            use_tls: .cloud_use_tls,
             tls_insecure_skip_verify: .cloud_tls_insecure_skip_verify
           },
           sub_inverters: [

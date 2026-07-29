@@ -35,7 +35,8 @@ var (
 // driver work without stalling the MQTT network reader.
 type MessageHandler func(topic string, payload []byte)
 
-// Client is a per-plant MQTT/TLS connection to GbbOptimizer.
+// Client is a per-plant MQTT connection to GbbOptimizer (TLS by default,
+// plaintext when the plant sets use_tls: false).
 type Client struct {
 	plantID string
 	logger  logbuf.Logger
@@ -78,13 +79,9 @@ func newClient(cloud config.Cloud, logger logbuf.Logger, factory backendFactory)
 		),
 	}
 
-	tlsConfig := &tls.Config{
-		MinVersion:         tls.VersionTLS12,
-		ServerName:         strings.Trim(cloud.MQTTAddress, "[]"),
-		InsecureSkipVerify: cloud.TLSInsecureSkipVerify, //nolint:gosec // Explicit troubleshooting setting from validated config.
-	}
-	if cloud.TLSInsecureSkipVerify {
-		client.logger.Warn("MQTT TLS certificate verification is disabled")
+	scheme := "tcp://"
+	if cloud.UseTLS {
+		scheme = "tls://"
 	}
 
 	brokerAddress := net.JoinHostPort(
@@ -92,14 +89,29 @@ func newClient(cloud config.Cloud, logger logbuf.Logger, factory backendFactory)
 		fmt.Sprintf("%d", cloud.MQTTPort),
 	)
 	options := mqtt.NewClientOptions().
-		AddBroker("tls://" + brokerAddress).
+		AddBroker(scheme + brokerAddress).
 		SetClientID("GbbConnect2_" + cloud.PlantID).
 		SetUsername(cloud.PlantID).
 		SetPassword(cloud.PlantToken).
-		SetTLSConfig(tlsConfig).
 		SetProtocolVersion(4).
 		SetAutoReconnect(false).
 		SetConnectRetry(false)
+
+	if cloud.UseTLS {
+		options.SetTLSConfig(&tls.Config{
+			MinVersion:         tls.VersionTLS12,
+			ServerName:         strings.Trim(cloud.MQTTAddress, "[]"),
+			InsecureSkipVerify: cloud.TLSInsecureSkipVerify, //nolint:gosec // Explicit troubleshooting setting from validated config.
+		})
+		if cloud.TLSInsecureSkipVerify {
+			client.logger.Warn("MQTT TLS certificate verification is disabled")
+		}
+	} else {
+		client.logger.Warn("MQTT TLS is disabled; plant token and traffic will be sent in cleartext")
+		if cloud.TLSInsecureSkipVerify {
+			client.logger.Warn("tls_insecure_skip_verify has no effect when use_tls is false")
+		}
+	}
 
 	options.SetConnectionLostHandler(func(_ mqtt.Client, err error) {
 		client.logger.Warn("MQTT connection lost", "error", err)
@@ -112,7 +124,7 @@ func newClient(cloud config.Cloud, logger logbuf.Logger, factory backendFactory)
 	return client, nil
 }
 
-// Connect establishes the TLS/MQTT session and completes any handler
+// Connect establishes the MQTT session and completes any handler
 // subscription registered before the call.
 func (c *Client) Connect(ctx context.Context) error {
 	if ctx == nil {

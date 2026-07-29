@@ -204,6 +204,7 @@ func canonicalAddonOptions(t *testing.T, options map[string]any) map[string]any 
 				"plant_token":              plant["cloud_plant_token"],
 				"mqtt_address":             plant["cloud_mqtt_address"],
 				"mqtt_port":                plant["cloud_mqtt_port"],
+				"use_tls":                  plant["cloud_use_tls"],
 				"tls_insecure_skip_verify": plant["cloud_tls_insecure_skip_verify"],
 			},
 			"sub_inverters": routed,

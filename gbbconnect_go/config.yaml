@@ -1,6 +1,6 @@
 ---
 name: "gbbconnect-go"
-version: "0.1.7"
+version: "0.1.8"
 slug: "gbbconnect_go"
 description: "Unofficial GbbOptimizer MQTT-to-Modbus bridge"
 url: "https://github.com/KrzysztofHajdamowicz/gbbconnect-go"
@@ -41,6 +41,7 @@ options:
       cloud_plant_token: ""
       cloud_mqtt_address: "gbboptimizer1-mqtt.gbbsoft.pl"
       cloud_mqtt_port: 8883
+      cloud_use_tls: true
       cloud_tls_insecure_skip_verify: false
   sub_inverters: []
 schema:
@@ -71,6 +72,7 @@ schema:
       cloud_plant_token: password
       cloud_mqtt_address: str
       cloud_mqtt_port: port
+      cloud_use_tls: bool
       cloud_tls_insecure_skip_verify: bool
   sub_inverters:
     - plant_number: int

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.8
+
+- Add the `cloud_use_tls` option (enabled by default) to allow plaintext MQTT
+  connections to brokers without a TLS endpoint, matching the `UseTls` flag of
+  the original GbbConnect2. Disabling it sends the plant token and all cloud
+  traffic unencrypted, so keep it on unless your broker offers no TLS.
+
 ## 0.1.7
 
 - Re-release of the 0.1.6 content, which Home Assistant installations did not

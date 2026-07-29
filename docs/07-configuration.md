@@ -67,6 +67,7 @@ plants:
       plant_token: "your-token-here"                     # secret (MQTT pass)
       mqtt_address: "gbboptimizer1-mqtt.gbbsoft.pl"
       mqtt_port: 8883
+      use_tls: true                                      # plaintext when false
       tls_insecure_skip_verify: false                    # troubleshooting only
 
     # Optional sub-inverters reachable behind this plant
@@ -115,6 +116,8 @@ convention (documented per ticket GC-011):
   `GBB_PLANT_<NUMBER>_CLOUD_PLANT_TOKEN`,
   `GBB_PLANT_<NUMBER>_CLOUD_PLANT_ID`.
   This lets users keep secrets out of the YAML file.
+- `GBB_PLANT_<NUMBER>_CLOUD_USE_TLS` toggles TLS for the cloud connection
+  (boolean, default `true`).
 
 Precedence: env var > config file > built-in default.
 

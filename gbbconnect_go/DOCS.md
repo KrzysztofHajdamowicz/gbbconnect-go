@@ -43,7 +43,9 @@ leave them at their defaults.
 Each enabled plant also requires `cloud.plant_id`, `cloud.plant_token`, and
 `cloud.mqtt_address`; these appear in the add-on form as `cloud_plant_id`,
 `cloud_plant_token`, and `cloud_mqtt_address`. Keep TLS verification enabled
-except for controlled troubleshooting.
+except for controlled troubleshooting, and keep `cloud_use_tls` on unless
+your broker has no TLS endpoint — disabling it sends the plant token
+unencrypted.
 
 Sub-inverters are configured in the separate `sub_inverters` list. Set
 `plant_number` to the number of the parent plant; the add-on groups matching

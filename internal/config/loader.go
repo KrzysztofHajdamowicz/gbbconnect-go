@@ -179,6 +179,7 @@ func applyEnvironment(config *Config, lookupEnv func(string) (string, bool)) err
 		if value, ok := lookupEnv(prefix + "PLANT_TOKEN"); ok {
 			config.Plants[index].Cloud.PlantToken = value
 		}
+		applyBool(prefix+"USE_TLS", &config.Plants[index].Cloud.UseTLS)
 	}
 
 	if len(problems) > 0 {

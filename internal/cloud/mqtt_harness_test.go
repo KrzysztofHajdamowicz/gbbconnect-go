@@ -117,3 +117,44 @@ func TestRealMQTTClientRequestResponseAndKeepaliveHarness(t *testing.T) {
 	}
 	broker.ExpectKeepalives(t, testPlantID, 3)
 }
+
+func TestRealMQTTClientConnectsToPlaintextBroker(t *testing.T) {
+	broker := cloudtest.New(t, cloudtest.Options{Plaintext: true})
+	cloudConfiguration := broker.CloudConfig(testPlantID, testPlantToken)
+	if cloudConfiguration.UseTLS {
+		t.Fatal("plaintext test broker did not disable TLS")
+	}
+
+	client, err := NewClient(cloudConfiguration, nil)
+	if err != nil {
+		t.Fatalf("NewClient() error = %v", err)
+	}
+	t.Cleanup(client.Disconnect)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := client.Connect(ctx); err != nil {
+		t.Fatalf("Connect() to plaintext test broker error = %v", err)
+	}
+
+	clock := newFakeLoopClock(time.Now())
+	clock.afterWait = func(waitCount int) {
+		if waitCount == 3 {
+			cancel()
+		}
+	}
+	loop, err := newKeepaliveLoop(
+		testPlantID,
+		client,
+		nil,
+		KeepaliveOptions{},
+		clock,
+	)
+	if err != nil {
+		t.Fatalf("newKeepaliveLoop() error = %v", err)
+	}
+	if err := loop.Run(ctx); err != nil {
+		t.Fatalf("keepalive Run() error = %v", err)
+	}
+	broker.ExpectKeepalives(t, testPlantID, 3)
+}

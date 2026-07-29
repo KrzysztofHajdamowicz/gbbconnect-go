@@ -266,11 +266,16 @@
           "minLength": 1
         },
         "mqtt_port": {
-          "description": "GbbOptimizer MQTT TLS port.",
+          "description": "GbbOptimizer MQTT port (8883 for the default TLS endpoint).",
           "type": "integer",
           "minimum": 1,
           "maximum": 65535,
           "default": 8883
+        },
+        "use_tls": {
+          "description": "Connect to the GbbOptimizer broker over TLS. Disable only for brokers without a TLS endpoint; credentials are then sent in cleartext.",
+          "type": "boolean",
+          "default": true
         },
         "tls_insecure_skip_verify": {
           "description": "Disable broker certificate verification for troubleshooting only.",

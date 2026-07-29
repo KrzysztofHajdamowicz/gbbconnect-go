@@ -18,11 +18,16 @@ Authoritative source:
   in the original config default; in practice the cloud provides the real
   hostname during plant setup, so treat it as a required configured value).
 - **Port**: per-plant `GbbOptimizer_Mqtt_Port`, default `8883`.
-- **TLS**: required. In the original, production builds set `UseTls = true`; DEBUG
-  builds set `IgnoreCertificateChainErrors = true`. For `gbbconnect-go`:
+- **TLS**: on by default. In the original, production builds set `UseTls = true`;
+  DEBUG builds set `IgnoreCertificateChainErrors = true`. For `gbbconnect-go`:
   - Default: TLS on, full certificate verification.
+  - Config flag `cloud.use_tls` (default `true`) mirrors the original `UseTls`;
+    setting it to `false` dials the broker over plaintext `tcp://` for brokers
+    without a TLS endpoint. It is loudly logged because the plant token then
+    travels unencrypted.
   - Optional config flag `mqtt.tls_insecure_skip_verify` (default `false`) for
-    troubleshooting only; it must be opt-in and loudly logged.
+    troubleshooting only; it must be opt-in and loudly logged. It has no
+    effect when `use_tls` is `false`.
 
 ## 2. Authentication
 
@@ -117,7 +122,8 @@ the response Header, optionally attaches incremental logs, and publishes to
 
 - [x] Client ID `GbbConnect2_{PlantId}`.
 - [x] Username = PlantId, Password = PlantToken.
-- [x] TLS on by default with verification.
+- [x] TLS on by default with verification; optional plaintext via
+      `use_tls: false`, mirroring the original `UseTls` flag.
 - [x] Subscribe `{PlantId}/ModbusInMqtt/toDevice` QoS 1.
 - [x] Publish responses `{PlantId}/ModbusInMqtt/fromDevice` QoS 2.
 - [x] Publish keepalive `{PlantId}/keepalive` QoS 1, empty payload, every 60 s.
