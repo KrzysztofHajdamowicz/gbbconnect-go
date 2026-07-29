@@ -132,14 +132,16 @@ func New(t *testing.T, options Options) *Broker {
 }
 
 // CloudConfig returns endpoint and credentials suitable for the production
-// cloud client. A plaintext broker is useful only to non-production test
-// clients because gbbconnect intentionally always dials MQTT over TLS.
+// cloud client. A TLS broker uses a self-signed certificate, so verification
+// is skipped; a plaintext broker yields use_tls: false so the production
+// client dials it without TLS.
 func (broker *Broker) CloudConfig(plantID, plantToken string) config.Cloud {
 	return config.Cloud{
 		PlantID:               plantID,
 		PlantToken:            plantToken,
 		MQTTAddress:           broker.host,
 		MQTTPort:              broker.port,
+		UseTLS:                !broker.plaintext,
 		TLSInsecureSkipVerify: !broker.plaintext,
 	}
 }

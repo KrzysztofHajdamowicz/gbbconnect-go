@@ -150,6 +150,12 @@ configuration:
         name: GbbOptimizer MQTT port
         description: >-
           TCP port of the GbbOptimizer MQTT broker, normally 8883 (TLS).
+      cloud_use_tls:
+        name: Use TLS for the cloud connection
+        description: >-
+          Connects to the GbbOptimizer MQTT broker over TLS. Keep enabled;
+          disabling sends the plant token and all traffic unencrypted. Use
+          only with brokers that have no TLS endpoint.
       cloud_tls_insecure_skip_verify:
         name: Skip TLS certificate verification
         description: >-

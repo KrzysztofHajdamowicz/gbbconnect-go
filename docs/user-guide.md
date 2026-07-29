@@ -32,7 +32,8 @@ The host must be able to:
 - resolve and reach the configured MQTT hostname on TCP port `8883` (unless the
   existing configuration specifies another port);
 - reach the inverter dongle/gateway address;
-- keep accurate system time for TLS certificate validation.
+- keep accurate system time for TLS certificate validation (when TLS is
+  enabled, which is the default).
 
 ## 2. Docker quick start
 
@@ -235,6 +236,7 @@ plants:
       plant_token: ""
       mqtt_address: "gbboptimizer1-mqtt.gbbsoft.pl"
       mqtt_port: 8883
+      use_tls: true
       tls_insecure_skip_verify: false
 ```
 
@@ -259,6 +261,7 @@ plants:
       plant_token: ""
       mqtt_address: "gbboptimizer1-mqtt.gbbsoft.pl"
       mqtt_port: 8883
+      use_tls: true
       tls_insecure_skip_verify: false
 ```
 
@@ -284,6 +287,7 @@ plants:
       plant_token: ""
       mqtt_address: "gbboptimizer1-mqtt.gbbsoft.pl"
       mqtt_port: 8883
+      use_tls: true
       tls_insecure_skip_verify: false
 ```
 
@@ -312,6 +316,7 @@ plants:
       plant_token: ""
       mqtt_address: "gbboptimizer1-mqtt.gbbsoft.pl"
       mqtt_port: 8883
+      use_tls: true
       tls_insecure_skip_verify: false
 ```
 
@@ -473,6 +478,9 @@ list position.
   proxy requires its CA to be trusted by the host/image.
 - `tls_insecure_skip_verify: true` disables server identity verification. Use
   it only briefly to isolate a certificate problem, never as the permanent fix.
+- `use_tls: false` switches the cloud connection to plaintext MQTT. It is meant
+  only for brokers without a TLS endpoint, not as a workaround for certificate
+  problems: the plant token and all traffic are then sent unencrypted.
 
 After a failed cloud cycle, production mode waits five minutes before retrying.
 `--dev` or `runtime.debug: true` shortens that backoff to ten seconds for

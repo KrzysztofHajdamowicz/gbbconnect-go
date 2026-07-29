@@ -13,7 +13,7 @@ request batches, executes them against the plant's inverter over a pluggable
 
 ```mermaid
 flowchart TB
-    cloud["GbbOptimizer Cloud (MQTT broker, TLS 8883)"]
+    cloud["GbbOptimizer Cloud (MQTT broker, TLS 8883 by default)"]
 
     subgraph app [gbbconnect-go process]
         supervisor["Supervisor / lifecycle"]
@@ -211,8 +211,10 @@ for Docker/systemd/HA. See [09-deployment.md](09-deployment.md).
 
 ## 8. Security
 
-- TLS is mandatory for the cloud MQTT connection (port 8883). Certificate
+- TLS is the default for the cloud MQTT connection (port 8883). Certificate
   verification should be **on** by default (the original disables chain checks
-  only in DEBUG builds).
+  only in DEBUG builds). `cloud.use_tls: false` selects plaintext for brokers
+  without a TLS endpoint and is loudly logged, because the plant token then
+  travels unencrypted.
 - Secrets (`plant_token`) come from config/env; never log them. See
   [07-configuration.md](07-configuration.md) for secret handling and HA options.

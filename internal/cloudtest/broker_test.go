@@ -9,6 +9,10 @@ func TestBrokerCapturesAndClonesPublications(t *testing.T) {
 	t.Parallel()
 
 	broker := New(t, Options{Plaintext: true})
+	if configuration := broker.CloudConfig("plant", "token"); configuration.UseTLS ||
+		configuration.TLSInsecureSkipVerify {
+		t.Fatalf("plaintext CloudConfig() = %+v", configuration)
+	}
 	payload := []byte(`{"request":true}`)
 	broker.PublishRequest(t, "plant", payload)
 	payload[0] = 'X'
@@ -39,6 +43,7 @@ func TestBrokerTLSResponseAndKeepaliveAssertions(t *testing.T) {
 	configuration := broker.CloudConfig("plant", "token")
 	if configuration.MQTTAddress != "127.0.0.1" ||
 		configuration.MQTTPort == 0 ||
+		!configuration.UseTLS ||
 		!configuration.TLSInsecureSkipVerify {
 		t.Fatalf("CloudConfig() = %+v", configuration)
 	}

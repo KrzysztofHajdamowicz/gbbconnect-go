@@ -174,6 +174,7 @@ func TestEnvironmentOverrides(t *testing.T) {
 			"GBB_LOGGING_DIRECTORY":         "/logs",
 			"GBB_PLANT_1_CLOUD_PLANT_ID":    "overridden-id",
 			"GBB_PLANT_1_CLOUD_PLANT_TOKEN": "overridden-token",
+			"GBB_PLANT_1_CLOUD_USE_TLS":     "false",
 		}),
 	})
 	if err != nil {
@@ -188,7 +189,8 @@ func TestEnvironmentOverrides(t *testing.T) {
 		!config.Logging.DriverTraceRaw ||
 		config.Logging.Directory != "/logs" ||
 		config.Plants[0].Cloud.PlantID != "overridden-id" ||
-		config.Plants[0].Cloud.PlantToken != "overridden-token" {
+		config.Plants[0].Cloud.PlantToken != "overridden-token" ||
+		config.Plants[0].Cloud.UseTLS {
 		t.Fatalf("unexpected overrides: %#v", config.Redacted())
 	}
 }
@@ -200,15 +202,17 @@ func TestInvalidEnvironmentOverride(t *testing.T) {
 	_, err := Load(LoadOptions{
 		Path: path,
 		LookupEnv: mapEnvironment(map[string]string{
-			"GBB_RUNTIME_DEBUG":        "sometimes",
-			"GBB_LOGGING_DRIVER_TRACE": "perhaps",
+			"GBB_RUNTIME_DEBUG":         "sometimes",
+			"GBB_LOGGING_DRIVER_TRACE":  "perhaps",
+			"GBB_PLANT_1_CLOUD_USE_TLS": "banana",
 		}),
 	})
 	if err == nil {
 		t.Fatal("Load() error = nil")
 	}
 	if !strings.Contains(err.Error(), "GBB_RUNTIME_DEBUG") ||
-		!strings.Contains(err.Error(), "GBB_LOGGING_DRIVER_TRACE") {
+		!strings.Contains(err.Error(), "GBB_LOGGING_DRIVER_TRACE") ||
+		!strings.Contains(err.Error(), "GBB_PLANT_1_CLOUD_USE_TLS") {
 		t.Fatalf("environment errors were not aggregated: %v", err)
 	}
 }

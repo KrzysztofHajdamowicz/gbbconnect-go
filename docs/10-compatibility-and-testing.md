@@ -155,7 +155,9 @@ ephemeral loopback port, and uses a generated self-signed certificate by
 default. It publishes canonical QoS 1 requests and captures response/keepalive
 publishes with their original topic, payload, retained flag, and QoS. Assertion
 helpers compare response JSON semantically and count empty QoS 1 keepalives.
-Plaintext mode is available for non-production test clients.
+Plaintext mode is available and, together with `use_tls: false`, is dialled by
+the production client too (see the plaintext harness test in
+`internal/cloud/mqtt_harness_test.go`).
 
 - An embedded MQTT broker (or a real broker in CI) where the test:
   1. publishes a request to `{PlantId}/ModbusInMqtt/toDevice`,
